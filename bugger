@@ -63,9 +63,13 @@ class Parser(object):
       'VARNAME',
       'COMMENT',
       'TASKNAME',
+      'INDENT',
+      'COMMAND',
+      'WHITESPACE',
+      'NEWLINE',
     )
 
-    literals = ":"
+    literals = ":$,"
 
     # TODO: this doesn't allow escaping of strings, nor single-quoted strings.
     t_STRING = r'"[\"]"'
@@ -76,13 +80,27 @@ class Parser(object):
     # allowed.
     t_TASKNAME = r'[A-Za-z][a-zA-Z0-9\-]*'
 
+    def t_INDENT(t):
+      r'\n\ \ '
+      t.lexer.lineno += 1
+      return t
 
-    # TODO: can't ignore whitespace at the start of a line
-    t_ignore = ' \t'
+    def t_COMMAND(t):
+      r'\s+\S+'
 
-    def t_newline(t):
-      r'\n+'
-      t.lexer.lineno += len(t.value)
+
+
+    # Low priority: Throw away the newlines that aren't indents
+    def t_NEWLINE(t):
+      r'\n'
+      t.lexer.lineno += 1
+      pass
+
+    # Low priority: Throw away remaining whitespace
+    def t_WHITESPACE(t):
+      r'\s'
+      pass
+
 
 
     def p_file(p):
@@ -112,13 +130,60 @@ class Parser(object):
 
     def p_task(p):
       """
-        task : TASKNAME ':'
+        task : TASKNAME ':' subtask_list
       """
       p[0] = ('task', p[1])
 
-    # Enforced line ending
 
-    debug = False
+    def p_subtask_list(p):
+      """
+        subtask_list : subtask_list subtask
+                     | empty
+      """
+      if len(p) == 2:
+        p[0] = []
+      else:
+        p[0] = p[1] + [p[2]]
+
+
+    def p_subtask(p):
+      """
+        subtask : INDENT nested_subtasks
+                | INDENT command_subtask
+      """
+      p[0] = p[2]
+
+    def p_nested_subtasks(p):
+      """
+        nested_subtasks : nested_subtasks ',' nested_subtasks
+                        | TASKNAME
+      """
+      if len(p) == 2:
+        p[0] = [('subtask', p[1])]
+      else:
+        p[0] = p[1] + p[3]
+
+
+    def p_command_subtask(p):
+      """
+        command_subtask : '$' WHITESPACE COMMAND NEWLINE
+      """
+      p[0] = ('command', p[3])
+
+
+    def t_error(p):
+      print p
+      sys.exit(1)
+
+    def column_number(input, lexpos):
+      last_cr = input.rfind('\n', 0, lexpos)
+      if last_cr < 0:
+        last_cr = 0
+      column = (token.lexpos - last_cr) + 1
+      return column
+
+
+    debug = True
     lex.lex(debug=debug)
     parser = yacc.yacc(debug=debug)
     return parser.parse(input, debug=debug)
