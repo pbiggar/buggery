@@ -120,6 +120,13 @@ def parse_buggery_file():
   tasks = Tasks()
   current_task = None
 
+  # Find the buggery file
+  if not os.path.exists(filename):
+    glob.glob("*.buggery")
+
+  if file.exists("buggery")
+
+
   for l in file("buggery"):
 
     # remove comments
