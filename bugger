@@ -3,7 +3,17 @@
 import string
 import pprint
 import sys
-from optparse import OptionParser # use optparse rather than argparse since it's more portable.
+import os
+import glob
+from optparse import OptionParser # use optparse rather than argparse since it's portable between versions, not just 2.7 and beyond.
+
+class Error(Exception):
+  pass
+
+class WhatToDo(Exception):
+  pass
+
+
 
 class Task(object):
 
@@ -82,8 +92,8 @@ class Tasks(object):
     s = subtask_string
     if s[0] in ['$']:               # shell tasks
       self.add_shell_subtask(s)
-    else:                           # comma separated lists of tasks
-      for subtask_name in [string.strip (sep) for sep in string.split(s, ',')]:
+    else:                           # comma or semi-colon separated lists of tasks
+      for subtask_name in [string.strip (sep) for sep in string.split(s, ',;')]:
         self._referenced_tasks.add(subtask_name)
         self.add_nested_subtask(subtask_name)
 
@@ -121,13 +131,17 @@ def parse_buggery_file():
   current_task = None
 
   # Find the buggery file
+  filename = "buggery"
   if not os.path.exists(filename):
-    glob.glob("*.buggery")
+    filenames = glob.glob("*.buggery")
+    if len(filenames) > 1:
+      raise WhatToDo("more than one file")
+    if len(filenames) == 0:
+      raise Error("No buggery or .buggery files found")
+    filename = filenames[0]
 
-  if file.exists("buggery")
 
-
-  for l in file("buggery"):
+  for l in file(filename):
 
     # remove comments
     # TODO: this doesn't allow # to appear anywhere, not even in string literals
