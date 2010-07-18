@@ -8,6 +8,8 @@ Buggery file
 Name
 ------
 
-The file must be named 'buggery' or match the glob '*.buggery'. This is case-sensitive.
+The file must match the glob '*.buggery'. This is case-sensitive.
+
+If there are multiple .buggery files, an error is thrown. Suggestions on what to do instead are welcome.
 
 
