@@ -69,37 +69,39 @@ class Parser(object):
       'NEWLINE',
     )
 
-    literals = ":$,"
+    literals = ":,"
 
     # TODO: this doesn't allow escaping of strings, nor single-quoted strings.
     t_STRING = r'"[\"]"'
+
+    # Put this before TASKNAME
+    def t_COMMAND(t):
+      r'\$\s\S[^\n]*(?=\n)' # Starts with '$ ' then a character, and goes to the end of the line.
+      t.value = t.value[2:]
+      return t
 
     # A task must flush left, be comprised entirely of lower-case letters and
     # hyphens (no CamelCase allowed), and may optionally start with an
     # upper-case letter to indicate top-level tasks. Underscores are not
     # allowed.
-    t_TASKNAME = r'[A-Za-z][a-zA-Z0-9\-]*'
-
-    def t_INDENT(t):
-      r'\n\ \ '
-      t.lexer.lineno += 1
+    def t_TASKNAME(t):
+      r'[A-Za-z][a-zA-Z0-9\-]*'
       return t
 
-    def t_COMMAND(t):
-      r'\s+\S+'
-
-
+    def t_INDENT(t):
+      r'(?<=\n)\ \ (?=\S)' # Exactly 2 spaces, preceeded by a \n, followed by non-whitespace
+      t.lexer.lineno += 1
+      return t
 
     # Low priority: Throw away the newlines that aren't indents
     def t_NEWLINE(t):
       r'\n'
       t.lexer.lineno += 1
-      pass
 
     # Low priority: Throw away remaining whitespace
     def t_WHITESPACE(t):
       r'\s'
-      pass
+      return t
 
 
 
@@ -132,7 +134,7 @@ class Parser(object):
       """
         task : TASKNAME ':' subtask_list
       """
-      p[0] = ('task', p[1])
+      p[0] = ('task', p[1], p[3])
 
 
     def p_subtask_list(p):
@@ -155,20 +157,20 @@ class Parser(object):
 
     def p_nested_subtasks(p):
       """
-        nested_subtasks : nested_subtasks ',' nested_subtasks
+        nested_subtasks : TASKNAME ',' nested_subtasks
                         | TASKNAME
       """
       if len(p) == 2:
         p[0] = [('subtask', p[1])]
       else:
-        p[0] = p[1] + p[3]
+        p[0] = [('subtask', p[1])] + p[3]
 
 
     def p_command_subtask(p):
       """
-        command_subtask : '$' WHITESPACE COMMAND NEWLINE
+        command_subtask : COMMAND
       """
-      p[0] = ('command', p[3])
+      p[0] = ('command', p[1])
 
 
     def t_error(p):
