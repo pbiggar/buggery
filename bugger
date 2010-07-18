@@ -8,11 +8,127 @@ import glob
 import re
 from optparse import OptionParser # use optparse rather than argparse since it's portable between versions, not just 2.7 and beyond.
 
+
 class Error(Exception):
   pass
 
 class WhatToDo(Exception):
   pass
+
+
+
+
+try:
+  import ply.lex as lex
+  import ply.yacc as yacc
+except ImportError:
+  sys.exit("""PLY (Python Lex-Yacc) library required.
+
+  On ubuntu:
+    $ apt-get install python-ply
+
+  Otherwise, download and install from http://www.dabeaz.com/ply/
+""")
+
+
+class Parser(object):
+  """Generate a nice AST to use later. We can implement the rule running as an AST walker.
+  Here are the productions, ignoring syntactic tokens:
+
+    # File
+    file := task*
+
+    # Task declarations
+    task := TASK-NAME parameter* subtask+
+    parameter := PARAM-NAME default-value?
+    default-value := string|variable
+    variable := VAR-NAME
+
+    # Subtask declarations
+    subtask := lhs? command|nested
+    command := string
+    nested := SUBTASK-NAME argument?
+    argument := string
+    lhs := VAR-NAME
+
+    # Final
+    string := (string-literal|variable-interpolation)+
+    variable-interpolation := VAR-NAME
+  """
+
+
+  def parse(self, input):
+    tokens = (
+      'STRING',
+      'VARNAME',
+      'COMMENT',
+      'TASKNAME',
+    )
+
+    literals = ":"
+
+    # TODO: this doesn't allow escaping of strings, nor single-quoted strings.
+    t_STRING = r'"[\"]"'
+
+    # A task must flush left, be comprised entirely of lower-case letters and
+    # hyphens (no CamelCase allowed), and may optionally start with an
+    # upper-case letter to indicate top-level tasks. Underscores are not
+    # allowed.
+    t_TASKNAME = r'[A-Za-z][a-zA-Z0-9\-]*'
+
+
+    # TODO: can't ignore whitespace at the start of a line
+    t_ignore = ' \t'
+
+    def t_newline(t):
+      r'\n+'
+      t.lexer.lineno += len(t.value)
+
+
+    def p_file(p):
+      """
+        file : task_list
+      """
+      p[0] = ('file', p[1])
+
+
+    def p_task_list(p):
+      """
+        task_list : task_list task
+                  | empty
+      """
+      if len(p) == 2:
+        p[0] = []
+      else:
+        p[0] = p[1] + [p[2]]
+
+
+    def p_empty(p):
+      """
+        empty :
+      """
+      pass
+
+
+    def p_task(p):
+      """
+        task : TASKNAME ':'
+      """
+      p[0] = ('task', p[1])
+
+    # Enforced line ending
+
+    debug = False
+    lex.lex(debug=debug)
+    parser = yacc.yacc(debug=debug)
+    return parser.parse(input, debug=debug)
+
+
+
+
+
+
+
 
 
 
@@ -63,19 +179,9 @@ class Tasks(object):
     if line [-1] != ':':
       raise Exception("syntax error: each task name must end in ':'")
 
-    strs = re.match("^(\w+)(\(.*\))?:$", line)
-    assert strs != None
-#(\((\w+\s*)?(,\w+\s*)\))?:$") # word followed by optional bracketed list of comma separated arguments. This is why we need a parser for this.
     name = strs.group(1)
     argstring = strs.group(2)
-    args = []
     # Comma-separated list of NAME=DEFAULT_VALUE
-    if argstring:
-      for arg in string.split(argstring, ','):
-        arg_default = 
-        (arg_name, arg_default) = string.split('=')
-        args.append(arg)
-
 
     print name
     print args
@@ -147,15 +253,6 @@ def parse_buggery_file():
   tasks = Tasks()
   current_task = None
 
-  # Find the buggery file
-  filenames = glob.glob("*.buggery")
-  if len(filenames) > 1:
-    raise WhatToDo("more than one file")
-  if len(filenames) == 0:
-    raise Error("No .buggery files found")
-  filename = filenames[0]
-
-
   for l in file(filename):
 
     # remove comments
@@ -188,19 +285,31 @@ def parse_buggery_file():
 # Command-line options
 #######################
 
-parser = OptionParser()
-parser.add_option(  '-l',
-                    '--list',
-                    action="store_true",
-                    default=False,
-                    help="List all top-level tasks",
-                 )
-parser.add_option(  '--full-list',
-                    action="store_true",
-                    default=False,
-                    help="List all tasks",
-                 )
-(options, args) = parser.parse_args(sys.argv)
+def parse_command_line():
+  parser = OptionParser()
+  parser.add_option(  '-l',
+                      '--list',
+                      action="store_true",
+                      default=False,
+                      help="List all top-level tasks",
+                   )
+  parser.add_option(  '--full-list',
+                      action="store_true",
+                      default=False,
+                      help="List all tasks",
+                   )
+  parser.add_option(  '-f',
+                      '--file',
+                      action="store",
+                      default=None,
+                      type="string",
+                      help="Read FILE as a buggery file",
+                      dest="FILE",
+                   )
+
+  return parser.parse_args(sys.argv)
+
+(options, args) = parse_command_line()
 
 # If no task is given, run default.
 if len (args) == 1:
@@ -208,26 +317,41 @@ if len (args) == 1:
 
 
 
-# Read and check the file
-tasks = parse_buggery_file()
+# Find the buggery file
+if options.FILE:
+  filename = options.FILE
+else:
+  filenames = glob.glob("*.buggery")
+  if len(filenames) > 1:
+    raise WhatToDo("more than one file")
+  if len(filenames) == 0:
+    raise Error("No .buggery files found")
+  filename = filenames[0]
+input = file(filename).read()
+
+# Parse the buggery file
+parser = Parser()
+ast = parser.parse(input)
+print ast
+sys.exit(1)
 
 
 ##############################################
 # Process post-reading command-line options
 ##############################################
 if options.list:
-  print tasks.top_level_task_list()
+  print ast.top_level_task_list()
 
 if options.full_list:
-  print tasks.task_list()
+  print ast.task_list()
 
 
 ##############################################
 # Start processing tasks
 ##############################################
 
-tasks.check()
+ast.check()
 
 # Always run the startup task
-tasks.run_top_level_task("startup")
-tasks.run_top_level_task(task)
+ast.run_top_level_task("startup")
+ast.run_top_level_task(task)
