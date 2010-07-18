@@ -76,7 +76,7 @@ class Parser(object):
 
     # Put this before TASKNAME
     def t_COMMAND(t):
-      r'\$\s\S[^\n]*(?=\n)' # Starts with '$ ' then a character, and goes to the end of the line.
+      r'\$\s\S[^\n]*' # Starts with '$ ' then a character, and goes to the end of the line.
       t.value = t.value[2:]
       return t
 
@@ -102,6 +102,13 @@ class Parser(object):
     def t_WHITESPACE(t):
       r'\s'
       return t
+
+    # Low priority: Throw away remaining whitespace
+    def t_COMMENT(t):
+      r'\#[^\n]*'
+      return t
+
+
 
 
 
@@ -185,7 +192,7 @@ class Parser(object):
       return column
 
 
-    debug = True
+    debug = False
     lex.lex(debug=debug)
     parser = yacc.yacc(debug=debug)
     return parser.parse(input, debug=debug)
@@ -394,6 +401,7 @@ else:
   if len(filenames) == 0:
     raise Error("No .buggery files found")
   filename = filenames[0]
+  print "Running %s" % filename
 input = file(filename).read()
 
 # Parse the buggery file
