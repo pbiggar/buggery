@@ -5,6 +5,7 @@ import pprint
 import sys
 import os
 import glob
+import re
 from optparse import OptionParser # use optparse rather than argparse since it's portable between versions, not just 2.7 and beyond.
 
 class Error(Exception):
@@ -58,11 +59,27 @@ class Tasks(object):
     self._current_task = None
     self._referenced_tasks = set()
 
-  def add_task(self, name):
-    if name[-1] != ':':
+  def add_task(self, line):
+    if line [-1] != ':':
       raise Exception("syntax error: each task name must end in ':'")
 
-    name = name[:-1]
+    strs = re.match("^(\w+)(\(.*\))?:$", line)
+    assert strs != None
+#(\((\w+\s*)?(,\w+\s*)\))?:$") # word followed by optional bracketed list of comma separated arguments. This is why we need a parser for this.
+    name = strs.group(1)
+    argstring = strs.group(2)
+    args = []
+    # Comma-separated list of NAME=DEFAULT_VALUE
+    if argstring:
+      for arg in string.split(argstring, ','):
+        arg_default = 
+        (arg_name, arg_default) = string.split('=')
+        args.append(arg)
+
+
+    print name
+    print args
+
     if name in self._tasks:
       raise Exception("Task already exists: " + name)
 
