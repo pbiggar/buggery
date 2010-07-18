@@ -131,14 +131,12 @@ def parse_buggery_file():
   current_task = None
 
   # Find the buggery file
-  filename = "buggery"
-  if not os.path.exists(filename):
-    filenames = glob.glob("*.buggery")
-    if len(filenames) > 1:
-      raise WhatToDo("more than one file")
-    if len(filenames) == 0:
-      raise Error("No buggery or .buggery files found")
-    filename = filenames[0]
+  filenames = glob.glob("*.buggery")
+  if len(filenames) > 1:
+    raise WhatToDo("more than one file")
+  if len(filenames) == 0:
+    raise Error("No .buggery files found")
+  filename = filenames[0]
 
 
   for l in file(filename):
