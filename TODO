@@ -1,0 +1,19 @@
+* Write buggery tutorial, reference and FAQ.
+
+* Search up the hierarchy to find the first buggery file
+
+* Keep processing buggery files as you go up the hierarchy?
+
+* A -k flag to keep going after errors.
+
+* Allow calling python functions.
+
+* Define what operations result in what type
+
+* Pattern matching instead of conditionals
+
+* Checkpointing for lazy processing and saving time. Perhaps make notes of functions which can be checkpointed.
+
+* Parallel processing. Perhaps files use semi-colons to separate files which can't be parallelized, instead of commas
+
+* Turn the line parser into a real parser. This will mean # doesnt just break things, at the very least.
