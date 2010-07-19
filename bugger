@@ -159,14 +159,22 @@ class Parser(object):
       """
         subtask_line : INDENT assignment subtask
                      | INDENT assignment command
-                     | INDENT assignment STRING
+                     | INDENT assignment string
                      | INDENT subtask_list
                      | INDENT command
       """
-      if p[2] != None:
-        p[0] = ('assignment', p[2], p[3])
+      if len(p) == 3:
+        p[0] = p[2] # same for command or subtask_list
+
       else:
-        p[0] = p[3]
+        p[0] = ('assignment', p[2], p[3])
+
+
+    def p_string(p):
+      """
+        string : STRING
+      """
+      p[0] = ('string', p[1])
 
 
     def p_assignment(p):
