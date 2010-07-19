@@ -60,19 +60,15 @@ class Parser(object):
   def parse(self, input):
     tokens = (
       'STRING',
-      'VARNAME',
-      'COMMENT',
-      'TASKNAME',
+      'ID',
       'INDENT',
       'COMMAND',
-      'WHITESPACE',
-      'NEWLINE',
     )
 
-    literals = ":,"
+    literals = ":,="
 
     # TODO: this doesn't allow escaping of strings, nor single-quoted strings.
-    t_STRING = r'"[\"]"'
+    t_STRING = r'"[^"]*"'
 
     # Put this before TASKNAME
     def t_COMMAND(t):
@@ -84,7 +80,7 @@ class Parser(object):
     # hyphens (no CamelCase allowed), and may optionally start with an
     # upper-case letter to indicate top-level tasks. Underscores are not
     # allowed.
-    def t_TASKNAME(t):
+    def t_ID(t):
       r'[A-Za-z][a-zA-Z0-9\-]*'
       return t
 
@@ -98,15 +94,14 @@ class Parser(object):
       r'\n'
       t.lexer.lineno += 1
 
-    # Low priority: Throw away remaining whitespace
+    # Throw away remaining whitespace (low priority)
     def t_WHITESPACE(t):
       r'\s'
-      return t
 
-    # Low priority: Throw away remaining whitespace
+    # Throw away comments (low priority)
     def t_COMMENT(t):
       r'\#[^\n]*'
-      return t
+      pass
 
 
 
@@ -139,14 +134,15 @@ class Parser(object):
 
     def p_task(p):
       """
-        task : TASKNAME ':' subtask_list
+        task : ID ':' subtask_list
       """
       p[0] = ('task', p[1], p[3])
+      print ("Completed a task" + str(p[0]))
 
 
     def p_subtask_list(p):
       """
-        subtask_list : subtask_list subtask
+        subtask_list : subtask_list subtask_line
                      | empty
       """
       if len(p) == 2:
@@ -155,17 +151,27 @@ class Parser(object):
         p[0] = p[1] + [p[2]]
 
 
-    def p_subtask(p):
+    def p_subtask_line(p):
       """
-        subtask : INDENT nested_subtasks
-                | INDENT command_subtask
+        subtask_line : INDENT assignment nested_subtasks
+                     | INDENT assignment command_subtask
+                     | INDENT assignment STRING
       """
-      p[0] = p[2]
+      if p[2] != None:
+        p[0] = ('assignment', p[2], p[3])
+      else:
+        p[0] = p[3]
+
+    def p_assignment(p):
+      """
+        assignment : ID '='
+      """
+      p[0] = ('lvalue', p[1])
 
     def p_nested_subtasks(p):
       """
-        nested_subtasks : TASKNAME ',' nested_subtasks
-                        | TASKNAME
+        nested_subtasks : ID ',' nested_subtasks
+                        | ID
       """
       if len(p) == 2:
         p[0] = [('subtask', p[1])]
@@ -192,7 +198,7 @@ class Parser(object):
       return column
 
 
-    debug = False
+    debug = True
     lex.lex(debug=debug)
     parser = yacc.yacc(debug=debug)
     return parser.parse(input, debug=debug)

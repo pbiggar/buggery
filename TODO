@@ -4,7 +4,7 @@
 
 * Keep processing buggery files as you go up the hierarchy?
 
-* A -k flag to keep going after errors.
+* A -k flag to keep going after errors (after parsing).
 
 * Allow calling python functions.
 
@@ -14,6 +14,12 @@
 
 * Checkpointing for lazy processing and saving time. Perhaps make notes of functions which can be checkpointed.
 
-* Parallel processing. Perhaps files use semi-colons to separate files which can't be parallelized, instead of commas
+* Parallel processing. Wrap them in {}. Maybe go serial again after <>
 
 * Turn the line parser into a real parser. This will mean # doesnt just break things, at the very least.
+
+* Give an error for X=st1,st2
+
+* Deal nicely with wanting access to procid, exit code, stderr, not just stdout
+
+* I think the parsing strategy is to be very lenient and to get it all in the AST.

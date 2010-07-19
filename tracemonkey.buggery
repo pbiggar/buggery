@@ -17,10 +17,10 @@ Startup:
 # Task lists
 ##############################
 Default:
-  compile; trace-test, ref-test; sunspider; v8; ubench; build-ff, dump-patch
+  compile, {trace-test, ref-test}, sunspider, v8, ubench, build-ff, dump-patch
 
 Quick:
-  compile; trace-test; sunspider; ubench
+  compile, trace-test, sunspider, ubench
 
 Baseline: # run the benchmarks after popping all the directories
   PATCHNAME=$ hg qtop
