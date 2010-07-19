@@ -23,3 +23,5 @@
 * Deal nicely with wanting access to procid, exit code, stderr, not just stdout
 
 * I think the parsing strategy is to be very lenient and to get it all in the AST.
+
+* Allow cleanup. A nice syntax might be to indent more, and if an inner thing fails, then we can clean it up on the way out.
