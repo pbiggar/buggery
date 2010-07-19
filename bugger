@@ -134,16 +134,16 @@ class Parser(object):
 
     def p_task(p):
       """
-        task : ID ':' subtask_list
+        task : ID ':' subtask_lines
       """
       p[0] = ('task', p[1], p[3])
       print ("Completed a task" + str(p[0]))
 
 
-    def p_subtask_list(p):
+    def p_subtask_lines(p):
       """
-        subtask_list : subtask_list subtask_line
-                     | empty
+        subtask_lines : subtask_lines subtask_line
+                      | empty
       """
       if len(p) == 2:
         p[0] = []
@@ -153,7 +153,7 @@ class Parser(object):
 
     def p_subtask_line(p):
       """
-        subtask_line : INDENT assignment nested_subtasks
+        subtask_line : INDENT assignment subtask_list
                      | INDENT assignment command_subtask
                      | INDENT assignment STRING
       """
@@ -168,10 +168,10 @@ class Parser(object):
       """
       p[0] = ('lvalue', p[1])
 
-    def p_nested_subtasks(p):
+    def p_subtask_list(p):
       """
-        nested_subtasks : ID ',' nested_subtasks
-                        | ID
+        subtask_list : ID ',' subtask_list
+                     | ID
       """
       if len(p) == 2:
         p[0] = [('subtask', p[1])]
