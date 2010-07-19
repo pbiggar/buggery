@@ -39,21 +39,20 @@ class Parser(object):
     file := task*
 
     # Task declarations
-    task := TASK-NAME parameter* subtask+
-    parameter := PARAM-NAME default-value?
+    task := ID parameter* subtask_line+
+    parameter := ID default-value?
     default-value := string|variable
-    variable := VAR-NAME
+    variable := ID
 
     # Subtask declarations
-    subtask := lhs? command|nested
-    command := string
-    nested := SUBTASK-NAME argument?
-    argument := string
-    lhs := VAR-NAME
+    subtask_line := lvalue? COMMAND|(subtask*)
+    subtask := ID argument*
+    argument := string|variable
+    lvalue := ID
 
     # Final
     string := (string-literal|variable-interpolation)+
-    variable-interpolation := VAR-NAME
+    variable-interpolation := ID
   """
 
 
