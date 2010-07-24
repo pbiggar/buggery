@@ -204,13 +204,6 @@ class Parser(object):
       else:
         p[0] = [('subtask', p[1], p[3])]
 
-#    def p_params(p):
-#      """
-#        params : '(' param_list ')'
-#               | empty
-#      """
-#      if len(p) != 2:
-#        p[0] = p[2]
 
     def p_param_list(p):
       """
@@ -224,13 +217,17 @@ class Parser(object):
 
     def p_param(p):
       """
-        param : '$' ID
-              | STRING
+        param : variable
+              | string
       """
-      if len(p) == 2:
-        p[0] = ('STRING', p[1])
-      else:
-        p[0] = ('variable', p[1])
+      p[0] = p[1]
+
+
+    def p_variable(p):
+      """
+        variable : '$' ID
+      """
+      p[0] = ('variable', p[2])
 
 
 
