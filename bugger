@@ -33,7 +33,7 @@ except ImportError:
 
 class Parser(object):
   """Generate a nice AST to use later. We can implement the rule running as an AST walker.
-  Here are the productions, ignoring syntactic tokens:
+  Here are the parser productions, ignoring syntactic tokens:
 
     # File
     file := task*
@@ -53,6 +53,30 @@ class Parser(object):
     # Final
     string := (string-literal|variable-interpolation)+
     variable-interpolation := ID
+
+  The AST is slightly nicer:
+
+    # File
+    file := task*
+
+    # Task declarations
+    task := ID parameter* subtask+
+    parameter := ID default-value?
+    default-value := string|variable
+    variable := ID
+
+    # Subtask declarations
+    subtask := lvalue? (COMMAND|ID argument*)
+    argument := string|variable
+    lvalue := ID
+
+    # Final
+    string := (string-literal|variable-interpolation)+
+    variable-interpolation := ID
+
+  The AST is implemented as tuples containing the name of the production, followed by the parameters.
+  Lists are wrapped in tuples as in: ('param-list' [('param', ...), ('param', ...)])
+
   """
 
 
@@ -137,11 +161,11 @@ class Parser(object):
 
     def p_task(p):
       """
-        task : ID ':' subtask_lines
-             | ID '(' param_list ')' ':' subtask_lines
+        task : id ':' subtask_lines
+             | id '(' param_list ')' ':' subtask_lines
       """
       if len(p) == 4:
-        p[0] = ('task', p[1], [], p[3])
+        p[0] = ('task', p[1], ('param-list', []), p[3])
       else:
         p[0] = ('task', p[1], p[3], p[5])
       print ("Completed a task" + str(p[0]))
@@ -182,7 +206,7 @@ class Parser(object):
 
     def p_assignment(p):
       """
-        assignment : ID '='
+        assignment : id '='
       """
       if len(p) != 2:
         p[0] = ('lvalue', p[1])
@@ -200,11 +224,11 @@ class Parser(object):
 
     def p_subtask(p):
       """
-        subtask : ID '(' arg_list ')'
-                | ID
+        subtask : id '(' arg_list ')'
+                | id
       """
       if len(p) == 2:
-        p[0] = [('subtask', p[1], [])]
+        p[0] = [('subtask', p[1], ('arg-list', []))]
       else:
         p[0] = [('subtask', p[1], p[3])]
 
@@ -239,8 +263,8 @@ class Parser(object):
 
     def p_param(p):
       """
-        param : ID
-              | ID '=' default_param
+        param : id
+              | id '=' default_param
       """
       p[0] = p[1]
 
@@ -255,7 +279,7 @@ class Parser(object):
 
     def p_variable(p):
       """
-        variable : '$' ID
+        variable : '$' id
       """
       p[0] = ('variable', p[2])
 
@@ -266,6 +290,14 @@ class Parser(object):
         command : COMMAND
       """
       p[0] = ('command', p[1])
+
+    def p_id(p):
+      """
+        id : ID
+      """
+      p[0] = ('id', p[1])
+
+
 
 
     def t_error(p):
@@ -495,7 +527,7 @@ input = file(filename).read()
 # Parse the buggery file
 parser = Parser()
 ast = parser.parse(input)
-print ast
+print pprint.pprint(ast)
 sys.exit(1)
 
 
