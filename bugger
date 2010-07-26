@@ -64,7 +64,7 @@ class Parser(object):
       'COMMAND',
     )
 
-    literals = ":,=()"
+    literals = ":,=()$"
 
     # TODO: this doesn't allow escaping of strings, nor single-quoted strings.
     t_STRING = r'"[^"]*"'
