@@ -138,8 +138,12 @@ class Parser(object):
     def p_task(p):
       """
         task : ID ':' subtask_lines
+             | ID '(' param_list ')' ':' subtask_lines
       """
-      p[0] = ('task', p[1], p[3])
+      if len(p) == 4:
+        p[0] = ('task', p[1], [], p[3])
+      else:
+        p[0] = ('task', p[1], p[3], p[5])
       print ("Completed a task" + str(p[0]))
 
 
@@ -196,13 +200,31 @@ class Parser(object):
 
     def p_subtask(p):
       """
-        subtask : ID '(' param_list ')'
+        subtask : ID '(' arg_list ')'
                 | ID
       """
       if len(p) == 2:
         p[0] = [('subtask', p[1], [])]
       else:
         p[0] = [('subtask', p[1], p[3])]
+
+
+    def p_arg_list(p):
+      """
+        arg_list : arg ',' arg_list
+                 | arg
+      """
+      if len(p) == 2:
+        p[0] = [p[1]]
+      else:
+        p[0] = [p[1]] + p[3]
+
+    def p_arg(p):
+      """
+        arg : variable
+            | string
+      """
+      p[0] = p[1]
 
 
     def p_param_list(p):
@@ -217,10 +239,18 @@ class Parser(object):
 
     def p_param(p):
       """
-        param : variable
-              | string
+        param : ID
+              | ID '=' default_param
       """
       p[0] = p[1]
+
+    def p_default_param(p):
+      """
+        default_param : arg
+      """
+      p[0] = p[1]
+
+
 
 
     def p_variable(p):
