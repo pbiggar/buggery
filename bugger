@@ -45,10 +45,9 @@ class Parser(object):
     variable := ID
 
     # Subtask declarations
-    subtask_line := lvalue? COMMAND|(subtask*)
+    subtask_line := ID? COMMAND|(subtask*)
     subtask := ID argument*
     argument := string|variable
-    lvalue := ID
 
     # Final
     string := (string-literal|variable-interpolation)+
@@ -60,13 +59,13 @@ class Parser(object):
     file := task*
 
     # Task declarations
-    task := ID parameter* subtask+
-    parameter := ID default-value?
+    task := taskname:ID parameter* subtask+
+    parameter := paramname:ID default-value?
     default-value := string|variable
-    variable := ID
+    variable := varname:ID
 
     # Subtask declarations
-    subtask := lvalue? (COMMAND|ID argument*)
+    subtask := lvalue:ID? (COMMAND|taskname:ID argument*) # don't like this - move into subtask - but call it something else.
     argument := string|variable
     lvalue := ID
 
@@ -97,6 +96,7 @@ class Parser(object):
     def t_COMMAND(t):
       r'\$\s\S[^\n]*' # Starts with '$ ' then a character, and goes to the end of the line.
       t.value = t.value[2:]
+      t.value = ('COMMAND', t.value)
       return t
 
     # A task must flush left, be comprised entirely of lower-case letters and
@@ -105,6 +105,7 @@ class Parser(object):
     # allowed.
     def t_ID(t):
       r'[A-Za-z][a-zA-Z0-9\-]*'
+      t.value = ('ID', t.value)
       return t
 
     def t_INDENT(t):
@@ -161,13 +162,17 @@ class Parser(object):
 
     def p_task(p):
       """
-        task : id ':' subtask_lines
-             | id '(' param_list ')' ':' subtask_lines
+        task : ID ':' subtask_lines
+             | ID '(' param_list ')' ':' subtask_lines
       """
+      name = p[1]
       if len(p) == 4:
-        p[0] = ('task', p[1], ('param-list', []), p[3])
-      else:
-        p[0] = ('task', p[1], p[3], p[5])
+        params = []
+        subtasks = p[3]
+      else
+        params = p[3]
+        subtasks = p[5]
+      p[0] = ('task', name, ('param-list', params), ('subtask-list', subtasks))
       print ("Completed a task" + str(p[0]))
 
 
@@ -178,17 +183,20 @@ class Parser(object):
       """
       if len(p) == 2:
         p[0] = []
+      elif isinstance(p[2], list): # subtask_line can be a subtask_list
+        p[0] = p[1] + p[2]
       else:
         p[0] = p[1] + [p[2]]
 
 
+    # TODO: this is awkward - see if you can move the top 3 to the assignment production.
     def p_subtask_line(p):
       """
         subtask_line : INDENT assignment subtask
-                     | INDENT assignment command
+                     | INDENT assignment COMMAND
                      | INDENT assignment string
                      | INDENT subtask_list
-                     | INDENT command
+                     | INDENT COMMAND
       """
       if len(p) == 3:
         p[0] = p[2] # same for command or subtask_list
@@ -206,10 +214,10 @@ class Parser(object):
 
     def p_assignment(p):
       """
-        assignment : id '='
+        assignment : ID '='
       """
       if len(p) != 2:
-        p[0] = ('lvalue', p[1])
+        p[0] = p[1]
 
 
     def p_subtask_list(p):
@@ -224,13 +232,13 @@ class Parser(object):
 
     def p_subtask(p):
       """
-        subtask : id '(' arg_list ')'
-                | id
+        subtask : ID '(' arg_list ')'
+                | ID
       """
       if len(p) == 2:
-        p[0] = [('subtask', p[1], ('arg-list', []))]
+        p[0] = ('subtask', p[1], ('arg-list', []))
       else:
-        p[0] = [('subtask', p[1], p[3])]
+        p[0] = ('subtask', p[1], ('arg-list', p[3]))
 
 
     def p_arg_list(p):
@@ -263,8 +271,8 @@ class Parser(object):
 
     def p_param(p):
       """
-        param : id
-              | id '=' default_param
+        param : ID
+              | ID '=' default_param
       """
       p[0] = p[1]
 
@@ -279,23 +287,9 @@ class Parser(object):
 
     def p_variable(p):
       """
-        variable : '$' id
+        variable : '$' ID
       """
       p[0] = ('variable', p[2])
-
-
-
-    def p_command(p):
-      """
-        command : COMMAND
-      """
-      p[0] = ('command', p[1])
-
-    def p_id(p):
-      """
-        id : ID
-      """
-      p[0] = ('id', p[1])
 
 
 
