@@ -90,7 +90,10 @@ class Parser(object):
     literals = ":,=()$"
 
     # TODO: this doesn't allow escaping of strings, nor single-quoted strings.
-    t_STRING = r'"[^"]*"'
+    def t_STRING(t):
+      r'"[^"]*"'
+      t.value = ('STRING', t.value)
+      return t
 
     # Put this before TASKNAME
     def t_COMMAND(t):
@@ -169,9 +172,9 @@ class Parser(object):
       if len(p) == 4:
         params = []
         subtasks = p[3]
-      else
+      else:
         params = p[3]
-        subtasks = p[5]
+        subtasks = p[6]
       p[0] = ('task', name, ('param-list', params), ('subtask-list', subtasks))
       print ("Completed a task" + str(p[0]))
 
@@ -194,7 +197,7 @@ class Parser(object):
       """
         subtask_line : INDENT assignment subtask
                      | INDENT assignment COMMAND
-                     | INDENT assignment string
+                     | INDENT assignment STRING
                      | INDENT subtask_list
                      | INDENT COMMAND
       """
@@ -203,13 +206,6 @@ class Parser(object):
 
       else:
         p[0] = ('assignment', p[2], p[3])
-
-
-    def p_string(p):
-      """
-        string : STRING
-      """
-      p[0] = ('string', p[1])
 
 
     def p_assignment(p):
@@ -254,7 +250,7 @@ class Parser(object):
     def p_arg(p):
       """
         arg : variable
-            | string
+            | STRING
       """
       p[0] = p[1]
 
