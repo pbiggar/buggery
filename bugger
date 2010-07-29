@@ -176,7 +176,7 @@ class Parser(object):
         params = p[3]
         subtasks = p[6]
       p[0] = ('task', name, ('param-list', params), ('subtask-list', subtasks))
-      print ("Completed a task" + str(p[0]))
+      print ("Completed a task:\n" + pprint.pformat(p[0]))
 
 
     def p_subtask_lines(p):
@@ -302,167 +302,17 @@ class Parser(object):
       return column
 
 
-    debug = True
+    debug = False
     lex.lex(debug=debug)
     parser = yacc.yacc(debug=debug)
     return parser.parse(input, debug=debug)
 
 
 
-
-
-
-
-
-
-
-class Task(object):
-
-  def __init__(self, name):
-    self._name = name
-    self.subtask_names = []
-
-  def add_subtask(self, subtask_name):
-    self.subtask_names += [subtask_name]
-
-  def __str__(self):
-    return self._name + str(self.subtask_names)
-
-  def run(self, tasks):
-    for subtask_name in self.subtask_names:
-      tasks.run_task(subtask_name)
-
-
-
-class ShellSubtask(object):
-  def __init__(self, command):
-    self.command = command
-
-  def run(self, tasks):
-    print ("TODO: " + command)
-
-
-class NestedSubtask(object):
-  def __init__(self, name):
-    self.name = name
-
-  def run(self, tasks):
-    tasks.run_task(self.name)
-
-
-
-class Tasks(object):
-
-  def __init__(self):
-    self._tasks = {}
-    self._top_level_tasks = {}
-    self._current_task = None
-    self._referenced_tasks = set()
-
-  def add_task(self, line):
-    if line [-1] != ':':
-      raise Exception("syntax error: each task name must end in ':'")
-
-    name = strs.group(1)
-    argstring = strs.group(2)
-    # Comma-separated list of NAME=DEFAULT_VALUE
-
-    print name
-    print args
-
-    if name in self._tasks:
-      raise Exception("Task already exists: " + name)
-
-    task = Task(name)
-    self._tasks[name.lower()] = task
-    self._current_task = task
-
-    # Top level tasks are id'd by a capital first letter, though they can be accessed without them
-    if name[0].isupper():
-      self._top_level_tasks[name.lower()] = task
-
-  def add_subtask(self, subtask):
-    if self._current_task == None:
-      raise Exception("Subtask has no task:" + subtask)
-
-    self._current_task.add_subtask(subtask)
-
-  def add_shell_subtask(self, subtask_string):
-    self.add_subtask(ShellSubtask(subtask_string))
-
-  def add_nested_subtask(self, subtask_name):
-    self.add_subtask(NestedSubtask(subtask_name))
-
-
-  def add_parsed_subtasks(self, subtask_string):
-    """Hide the line parsing away from the top-level code"""
-    s = subtask_string
-    if s[0] in ['$']:               # shell tasks
-      self.add_shell_subtask(s)
-    else:                           # comma or semi-colon separated lists of tasks
-      for subtask_name in [string.strip (sep) for sep in string.split(s, ',;')]:
-        self._referenced_tasks.add(subtask_name)
-        self.add_nested_subtask(subtask_name)
-
-
-  def check(self):
-    """Apply some checks to the structures, make sure everything is OK"""
-    for name in self._referenced_tasks:
-      if name not in self._tasks:
-        raise Exception("Undefined task: " + name)
-
-
-  def run_top_level_task(self, name):
-    if name.lower() not in self._top_level_tasks:
-      raise Exception("No top-level task named: " + name)
-
-    self.run_task(name)
-
-
-  def run_task(self, taskname):
-    self._tasks[taskname].run(tasks)
-
-  def top_level_task_list(self):
-    return self._top_level_tasks.keys()
-
-  def task_list(self):
-    return self._tasks.keys()
-
-
-
-def parse_buggery_file():
-
-  # parse line-by-line, building tasks and subtasks as we go.
-  current_depth = 0
-  tasks = Tasks()
-  current_task = None
-
-  for l in file(filename):
-
-    # remove comments
-    # TODO: this doesn't allow # to appear anywhere, not even in string literals
-    l = string.split(l, '#')[0]
-
-    # expand tabs
-    l = string.expandtabs(l, 8)
-
-    # ignore blank lines
-    if (string.strip(l) == ""):
-      continue
-
-    # remove whitespace, keeping track of the identation ("depth")
-    depth = len(l)
-    l = string.lstrip(l)
-    depth -= len (l)
-    l = string.rstrip(l)
-
-    # build the structure
-    if depth == 0:
-      tasks.add_task(l)
-    else:
-      tasks.add_parsed_subtasks(l)
-
-  return tasks
+#raise Exception("Task already exists: " + name)
+#raise Exception("Subtask has no task:" + subtask)
+#raise Exception("Undefined task: " + name)
+#raise Exception("No top-level task named: " + name)
 
 
 #######################
@@ -517,7 +367,6 @@ input = file(filename).read()
 # Parse the buggery file
 parser = Parser()
 ast = parser.parse(input)
-print pprint.pprint(ast)
 sys.exit(1)
 
 
