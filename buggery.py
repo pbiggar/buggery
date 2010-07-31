@@ -122,7 +122,7 @@ class Parser(object):
       """
         file : task_list
       """
-      p[0] = p[1]
+      p[0] = Buggery(p[1])
 
 
     def p_task_list(p):
@@ -297,9 +297,7 @@ class Parser(object):
     self.debug = debug
     lex.lex(debug=debug)
     parser = yacc.yacc(debug=debug)
-    parse_tree = parser.parse(input, debug=debug)
-    pprint (parse_tree)
-#    ir = self.process(parse_tree)
+    ast = parser.parse(input, debug=debug)
 
 
 # Abstract classes
@@ -354,48 +352,70 @@ class Param(Node):
     self.name = name
     self.default = default
 
+class Buggery(Node):
+  def __init__(self, task_list):
+    self.tasks = {}
+    self.add_tasks (task_list)
+
+  def add_tasks(self, task_list):
+    for t in task_list:
+      self.add_task(t)
+
+  def add_task(self, task):
+    if task.name in self.tasks:
+      raise Error("Duplicate task: %s" % task.name)
+
+    self.tasks[task.name] = task
+
 
 #raise Exception("Task already exists: " + name)
 #raise Exception("Subtask has no task:" + subtask)
 #raise Exception("Undefined task: " + name)
 #raise Exception("No top-level task named: " + name)
 
-
-def test_no_subtasks():
+from nose.tools import raises
+@raises(Error)
+def no_subtasks():
   Parser().parse('mytask:\n')
-  raise Exception
 
 
+@raises(Error)
 def test_duplicate_task_name():
   Parser().parse('mytask:\n  pass\nmytask:\n  pass')
-  raise Exception
-  pass
 
-def test_task_not_defined():
+@raises(Error)
+def task_not_defined():
   Parser().parse('mytask:\n  other')
   raise Exception
   pass
 
-def test_too_many_params():
+@raises(Error)
+def too_many_params():
   raise Exception
 
-def test_too_few_params():
+@raises(Error)
+def too_few_params():
   raise Exception
 
-def test_right_number_of_params():
+@raises(Error)
+def right_number_of_params():
   raise Exception
 
 def simple_task():
   raise Exception
 
+@raises(Error)
 def four_spaces():
   raise Exception
 
+@raises(Error)
 def three_spaces():
   raise Exception
 
+@raises(Error)
 def one_space():
   raise Exception
 
+@raises(Error)
 def uninitialized_variable():
   raise Exception
