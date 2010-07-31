@@ -1,11 +1,7 @@
 #!/usr/bin/env python
 
-import string
-import pprint
 import sys
-import os
-import glob
-import re
+from pprint import pprint
 import ply.lex as lex
 import ply.yacc as yacc
 
@@ -25,14 +21,14 @@ class Parser(object):
     file := task*
 
     # Task declarations
-    task := ID parameter* subtask_line+
+    task := ID parameter* subtask+
     parameter := ID default-value?
     default-value := string|variable
     variable := ID
 
     # Subtask declarations
-    subtask_line := ID? COMMAND|(subtask*)
-    subtask := ID argument*
+    subtask := (ID? COMMAND)|(call*)
+    call := ID argument*
     argument := string|variable
 
     # Final
@@ -51,7 +47,8 @@ class Parser(object):
     variable := varname:ID
 
     # Subtask declarations
-    subtask := lvalue:ID? (COMMAND|taskname:ID argument*) # don't like this - move into subtask - but call it something else.
+    subtask := lvalue:ID? (COMMAND|call)
+    call := taskname:ID argument*
     argument := string|variable
     lvalue := ID
 
@@ -78,14 +75,12 @@ class Parser(object):
     # TODO: this doesn't allow escaping of strings, nor single-quoted strings.
     def t_STRING(t):
       r'"[^"]*"'
-      t.value = ('STRING', t.value)
       return t
 
     # Put this before TASKNAME
     def t_COMMAND(t):
       r'\$\s\S[^\n]*' # Starts with '$ ' then a character, and goes to the end of the line.
       t.value = t.value[2:]
-      t.value = ('COMMAND', t.value)
       return t
 
     # A task must flush left, be comprised entirely of lower-case letters and
@@ -94,7 +89,6 @@ class Parser(object):
     # allowed.
     def t_ID(t):
       r'[A-Za-z][a-zA-Z0-9\-]*'
-      t.value = ('ID', t.value)
       return t
 
     def t_INDENT(t):
@@ -128,7 +122,7 @@ class Parser(object):
       """
         file : task_list
       """
-      p[0] = ('file', p[1])
+      p[0] = p[1]
 
 
     def p_task_list(p):
@@ -161,8 +155,10 @@ class Parser(object):
       else:
         params = p[3]
         subtasks = p[6]
-      p[0] = ('task', name, ('param-list', params), ('subtask-list', subtasks))
-      print ("Completed a task:\n" + pprint.pformat(p[0]))
+
+      p[0] = Task (name, params, subtasks)
+      if self.debug:
+        print ("Completed a task:\n" + pprint.pformat(p[0]))
 
 
     def p_subtask_lines(p):
@@ -181,46 +177,48 @@ class Parser(object):
     # TODO: this is awkward - see if you can move the top 3 to the assignment production.
     def p_subtask_line(p):
       """
-        subtask_line : INDENT assignment subtask
-                     | INDENT assignment COMMAND
-                     | INDENT assignment STRING
-                     | INDENT subtask_list
+        subtask_line : INDENT lvalue call
+                     | INDENT lvalue COMMAND
+                     | INDENT lvalue STRING
+                     | INDENT call_list
                      | INDENT COMMAND
       """
       if len(p) == 3:
         p[0] = p[2] # same for command or subtask_list
 
       else:
-        p[0] = ('assignment', p[2], p[3])
+        p[0] = Assignment (p[2], p[3])
 
 
-    def p_assignment(p):
+    def p_lvalue(p):
       """
-        assignment : ID '='
+        lvalue : ID '='
       """
-      if len(p) != 2:
-        p[0] = p[1]
+      p[0] = p[1]
 
 
-    def p_subtask_list(p):
+    def p_call_list(p):
       """
-        subtask_list : subtask ',' subtask_list
-                     | subtask
+        call_list : call ',' call_list
+                  | call
       """
       if len(p) == 2:
         p[0] = [p[1]]
       else:
         p[0] = [p[1]] + p[3]
 
-    def p_subtask(p):
+
+    def p_call(p):
       """
-        subtask : ID '(' arg_list ')'
-                | ID
+        call : ID '(' arg_list ')'
+             | ID
       """
-      if len(p) == 2:
-        p[0] = ('subtask', p[1], ('arg-list', []))
-      else:
-        p[0] = ('subtask', p[1], ('arg-list', p[3]))
+      name = p[1]
+      params = []
+      if len(p) == 4:
+        params = p[3]
+
+      p[0] = Call(name, params)
 
 
     def p_arg_list(p):
@@ -251,12 +249,19 @@ class Parser(object):
       else:
         p[0] = [p[1]] + p[3]
 
+
     def p_param(p):
       """
         param : ID
               | ID '=' default_param
       """
-      p[0] = p[1]
+      name = p[1]
+      default = None
+      if len(p) == 4:
+        default = p[3]
+
+      p[0] = Param(name, default)
+
 
     def p_default_param(p):
       """
@@ -271,7 +276,7 @@ class Parser(object):
       """
         variable : '$' ID
       """
-      p[0] = ('variable', p[2])
+      p[0] = Variable(p[2])
 
 
 
@@ -289,10 +294,65 @@ class Parser(object):
 
 
     debug = False
+    self.debug = debug
     lex.lex(debug=debug)
     parser = yacc.yacc(debug=debug)
-    return parser.parse(input, debug=debug)
+    parse_tree = parser.parse(input, debug=debug)
+    pprint (parse_tree)
+#    ir = self.process(parse_tree)
 
+
+# Abstract classes
+class Node(object):
+  def check(self):
+    self._check()
+    raise TODO('subnodes')
+
+  def __repr__(self):
+    name = self.__class__.__name__.lower()
+    attrs = str(self.__dict__)
+    return '%s: %s' % (name, attrs)
+
+class Subtask(Node):
+  pass
+
+
+# Concrete classes
+class File(object):
+  def __init__(self, tasks):
+    raise TODO
+
+class Task(Node):
+  def __init__(self, name, params, subtasks):
+    self.name = name
+    self.params = params
+    self.subtasks = subtasks
+
+
+class Assignment(Node):
+  def __init__(self, lvalue, rvalue):
+    self.lvalue = lvalue
+    self.rvalue = rvalue
+
+
+class Command(Subtask):
+  def __init__(self, command):
+    self.command = command
+
+
+class Call(Subtask):
+  def __init__(self, target, args):
+    self.target = target
+    self.args = args
+
+class Variable(Node):
+  def __init__(self, name):
+    self.name = name
+
+class Param(Node):
+  def __init__(self, name, default):
+    self.name = name
+    self.default = default
 
 
 #raise Exception("Task already exists: " + name)
@@ -301,3 +361,41 @@ class Parser(object):
 #raise Exception("No top-level task named: " + name)
 
 
+def test_no_subtasks():
+  Parser().parse('mytask:\n')
+  raise Exception
+
+
+def test_duplicate_task_name():
+  Parser().parse('mytask:\n  pass\nmytask:\n  pass')
+  raise Exception
+  pass
+
+def test_task_not_defined():
+  Parser().parse('mytask:\n  other')
+  raise Exception
+  pass
+
+def test_too_many_params():
+  raise Exception
+
+def test_too_few_params():
+  raise Exception
+
+def test_right_number_of_params():
+  raise Exception
+
+def simple_task():
+  raise Exception
+
+def four_spaces():
+  raise Exception
+
+def three_spaces():
+  raise Exception
+
+def one_space():
+  raise Exception
+
+def uninitialized_variable():
+  raise Exception

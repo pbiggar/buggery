@@ -13,19 +13,17 @@ try:
   from buggery import Parser
 except ImportError, e:
   if str(e) == 'No module named ply.lex' or str(e) == 'No module named ply.yacc':
-    sys.exit("""PLY (Python Lex-Yacc) library required.
+    sys.exit(
+"""PLY (Python Lex-Yacc) library required.
 
-    On ubuntu:
-      $ apt-get install python-ply
+  On ubuntu:
+    $ apt-get install python-ply
 
-    Otherwise, download and install from http://www.dabeaz.com/ply/
-  """)
+  Otherwise, download and install from http://www.dabeaz.com/ply/
+""")
   raise e
 
 
-#raise Exception("Task already exists: " + name)
-#raise Exception("Subtask has no task:" + subtask)
-#raise Exception("Undefined task: " + name)
 #raise Exception("No top-level task named: " + name)
 
 
