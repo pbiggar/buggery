@@ -6,7 +6,7 @@ import ply.lex as lex
 import ply.yacc as yacc
 
 
-class Error(Exception):
+class UserError(Exception):
   pass
 
 class WhatToDo(Exception):
@@ -115,7 +115,7 @@ class Parser(object):
 
     def p_error(p):
       print p.__dict__
-      raise Error()
+      raise UserError()
 
 
     def p_file(p):
@@ -297,29 +297,43 @@ class Parser(object):
     self.debug = debug
     lex.lex(debug=debug)
     parser = yacc.yacc(debug=debug)
-    ast = parser.parse(input, debug=debug)
+    buggery = parser.parse(input, debug=debug)
+    buggery.check()
 
 
 # Abstract classes
 class Node(object):
-  def check(self):
-    self._check()
-    raise TODO('subnodes')
 
-  def __repr__(self):
-    name = self.__class__.__name__.lower()
-    attrs = str(self.__dict__)
-    return '%s: %s' % (name, attrs)
+  def traverse(self, callback_name, state):
+    method = getattr(self, callback_name, None)
+    if method != None:
+      method(state)
+
+    for k,v in self.__dict__.iteritems():
+      if isinstance(v, Node):
+        v.traverse(callback_name, state)
+
+      elif isinstance(v, list):
+        for elem in v: elem.traverse(callback_name, state)
+
+      elif isinstance(v, dict):
+        for key,val in v.items():
+          val.traverse(callback_name, state)
+
+      else:
+        assert False
+
+
+#  def __repr__(self):
+ #   name = self.__class__.__name__.lower()
+  #  attrs = str(self.__dict__)
+   # return '%s: %s' % (name, attrs)
 
 class Subtask(Node):
   pass
 
 
 # Concrete classes
-class File(object):
-  def __init__(self, tasks):
-    raise TODO
-
 class Task(Node):
   def __init__(self, name, params, subtasks):
     self.name = name
@@ -343,6 +357,10 @@ class Call(Subtask):
     self.target = target
     self.args = args
 
+  def _check(self, buggery):
+    if self.target not in buggery.tasks:
+      raise UserError("Task %s does not exist")
+
 class Variable(Node):
   def __init__(self, name):
     self.name = name
@@ -363,9 +381,13 @@ class Buggery(Node):
 
   def add_task(self, task):
     if task.name in self.tasks:
-      raise Error("Duplicate task: %s" % task.name)
+      raise UserError("Duplicate task: %s" % task.name)
 
     self.tasks[task.name] = task
+
+
+  def check(self):
+    self.traverse("_check", self)
 
 
 #raise Exception("Task already exists: " + name)
@@ -374,48 +396,46 @@ class Buggery(Node):
 #raise Exception("No top-level task named: " + name)
 
 from nose.tools import raises
-@raises(Error)
+@raises(UserError)
 def no_subtasks():
   Parser().parse('mytask:\n')
 
 
-@raises(Error)
+@raises(UserError)
 def test_duplicate_task_name():
   Parser().parse('mytask:\n  pass\nmytask:\n  pass')
 
-@raises(Error)
-def task_not_defined():
+@raises(UserError)
+def test_task_not_defined():
   Parser().parse('mytask:\n  other')
-  raise Exception
-  pass
 
-@raises(Error)
+@raises(UserError)
 def too_many_params():
   raise Exception
 
-@raises(Error)
+@raises(UserError)
 def too_few_params():
   raise Exception
 
-@raises(Error)
+@raises(UserError)
 def right_number_of_params():
   raise Exception
 
 def simple_task():
   raise Exception
 
-@raises(Error)
+@raises(UserError)
 def four_spaces():
   raise Exception
 
-@raises(Error)
+@raises(UserError)
 def three_spaces():
   raise Exception
 
-@raises(Error)
+@raises(UserError)
 def one_space():
   raise Exception
 
-@raises(Error)
+@raises(UserError)
 def uninitialized_variable():
   raise Exception
