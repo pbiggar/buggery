@@ -4,6 +4,7 @@ import sys
 from pprint import pprint
 import ply.lex as lex
 import ply.yacc as yacc
+from lcdict import arbitrary_dict
 
 
 class UserError(Exception):
@@ -310,24 +311,25 @@ class Node(object):
       method(state)
 
     for k,v in self.__dict__.iteritems():
-      if isinstance(v, Node):
-        v.traverse(callback_name, state)
+      self._nested_traverse(v, callback_name, state)
 
-      elif isinstance(v, list):
-        for elem in v: elem.traverse(callback_name, state)
+  def _nested_traverse(self, item, callback_name, state):
+    """Check subelements for Nodes to be traversed"""
+    if isinstance(item, Node):
+      item.traverse(callback_name, state)
 
-      elif isinstance(v, dict):
-        for key,val in v.items():
-          val.traverse(callback_name, state)
+    elif isinstance(item, list):
+      for elem in item: self._nested_traverse(elem, callback_name, state)
 
-      else:
-        assert False
+    elif isinstance(item, dict):
+      for key,val in item.items():
+        self._nested_traverse(val, callback_name, state)
 
 
-#  def __repr__(self):
- #   name = self.__class__.__name__.lower()
-  #  attrs = str(self.__dict__)
-   # return '%s: %s' % (name, attrs)
+  def __repr__(self):
+    name = self.__class__.__name__.lower()
+    attrs = str(self.__dict__)
+    return '%s: %s' % (name, attrs)
 
 class Subtask(Node):
   pass
@@ -359,7 +361,7 @@ class Call(Subtask):
 
   def _check(self, buggery):
     if self.target not in buggery.tasks:
-      raise UserError("Task %s does not exist")
+      raise UserError("Task %s not defined" % self.target)
 
 class Variable(Node):
   def __init__(self, name):
@@ -370,9 +372,10 @@ class Param(Node):
     self.name = name
     self.default = default
 
+
 class Buggery(Node):
   def __init__(self, task_list):
-    self.tasks = {}
+    self.tasks = arbitrary_dict()
     self.add_tasks (task_list)
 
   def add_tasks(self, task_list):
@@ -383,7 +386,7 @@ class Buggery(Node):
     if task.name in self.tasks:
       raise UserError("Duplicate task: %s" % task.name)
 
-    self.tasks[task.name] = task
+    self.tasks[task.name.lower()] = task
 
 
   def check(self):
@@ -397,7 +400,7 @@ class Buggery(Node):
 
 from nose.tools import raises
 @raises(UserError)
-def no_subtasks():
+def test_no_subtasks():
   Parser().parse('mytask:\n')
 
 
@@ -439,3 +442,6 @@ def one_space():
 @raises(UserError)
 def uninitialized_variable():
   raise Exception
+
+
+# TODO: lost of case sensitive stuff. Everything must be lower case, except the first letter of top-level task definitions

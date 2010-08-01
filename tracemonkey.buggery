@@ -17,10 +17,13 @@ Startup:
 # Task lists
 ##############################
 Default:
-  compile, trace-test, ref-test, sunspider, v8, ubench, build-ff, dump-patch
+  full
 
 Quick:
   compile, trace-test, sunspider, ubench
+
+Full:
+  compile, trace-test, ref-test, sunspider, v8, ubench, build-ff, dump-patch
 
 Baseline: # run the benchmarks after popping all the directories
   PATCHNAME=$ hg qtop
@@ -65,3 +68,12 @@ v8(DIR = $BUILDDIR):
 
 ubench(DIR = $BUILDDIR):
   $ ./sunspider --args="-j" --shell=$DIR/js --run=30 --suite=ubench
+
+
+##############################
+# Utils
+##############################
+# TODO: qfulldiff is only in my .hgrc file
+# TODO: 
+dump-patch:
+  $ hg qfulldiff > `hg qtop`.patch
