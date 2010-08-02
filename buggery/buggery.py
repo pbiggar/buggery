@@ -418,7 +418,8 @@ def test_task_not_defined():
   Parser().parse('mytask:\n  other')
 
 @raises(UserError)
-def too_many_params():
+def test_too_many_params():
+  Parser().parse('mytask:\n  other("param")\nother')
   raise Exception
 
 @raises(UserError)
