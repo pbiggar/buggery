@@ -67,11 +67,11 @@ if len (args) == 1:
 if options.FILE:
   filename = options.FILE
 else:
-  filenames = glob.glob("*.buggery")
+  filenames = glob.glob("*.bgr")
   if len(filenames) > 1:
     raise WhatToDo("more than one file")
   if len(filenames) == 0:
-    raise Error("No .buggery files found")
+    raise Error("No .bgr (buggery) files found")
   filename = filenames[0]
   print "Running %s" % filename
 input = file(filename).read()
