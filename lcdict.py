@@ -22,6 +22,12 @@ class arbitrary_dict(dict):
   def __contains__(self, key):
     return dict.__contains__(self, self.__keytransform__(key))
 
+  def get(self, key, default=None):
+    if self.__contains__(key):
+      return self[key]
+
+    return default
+
 
 
 class lcdict(arbitrary_dict):
