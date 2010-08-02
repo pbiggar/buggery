@@ -1,0 +1,7 @@
+
+
+default:
+  other("asd", "ad")
+
+other(A,B,C):
+  $ ls

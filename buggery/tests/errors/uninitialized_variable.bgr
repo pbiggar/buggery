@@ -1,0 +1,7 @@
+
+default:
+  task(VAR)
+
+task(X):
+  $ ls $X
+  

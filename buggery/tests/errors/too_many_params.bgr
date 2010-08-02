@@ -1,0 +1,5 @@
+default:
+  other("asd")
+
+other(A):
+  $ ls

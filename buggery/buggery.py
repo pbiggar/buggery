@@ -409,45 +409,10 @@ def test_no_subtasks():
   Parser().parse('mytask:\n')
 
 
-@raises(UserError)
-def test_duplicate_task_name():
-  Parser().parse('mytask:\n  pass\nmytask:\n  pass')
-
-@raises(UserError)
-def test_task_not_defined():
-  Parser().parse('mytask:\n  other')
-
-@raises(UserError)
-def test_too_many_params():
-  Parser().parse('mytask:\n  other("param")\nother')
-  raise Exception
-
-@raises(UserError)
-def too_few_params():
-  raise Exception
-
-@raises(UserError)
 def right_number_of_params():
   raise Exception
 
 def simple_task():
   raise Exception
-
-@raises(UserError)
-def four_spaces():
-  raise Exception
-
-@raises(UserError)
-def three_spaces():
-  raise Exception
-
-@raises(UserError)
-def one_space():
-  raise Exception
-
-@raises(UserError)
-def uninitialized_variable():
-  raise Exception
-
 
 # TODO: lost of case sensitive stuff. Everything must be lower case, except the first letter of top-level task definitions
