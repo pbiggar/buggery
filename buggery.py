@@ -4,7 +4,7 @@ import sys
 from pprint import pprint
 import ply.lex as lex
 import ply.yacc as yacc
-from lcdict import arbitrary_dict
+from lcdict import lcdict
 
 
 class UserError(Exception):
@@ -343,6 +343,11 @@ class Task(Node):
     self.subtasks = subtasks
 
 
+  def _check(self, buggery):
+    if len(self.subtasks) == 0:
+      raise UserError ("Task %s has no subtasks" % self.name)
+
+
 class Assignment(Node):
   def __init__(self, lvalue, rvalue):
     self.lvalue = lvalue
@@ -375,7 +380,7 @@ class Param(Node):
 
 class Buggery(Node):
   def __init__(self, task_list):
-    self.tasks = arbitrary_dict()
+    self.tasks = lcdict()
     self.add_tasks (task_list)
 
   def add_tasks(self, task_list):
@@ -386,7 +391,7 @@ class Buggery(Node):
     if task.name in self.tasks:
       raise UserError("Duplicate task: %s" % task.name)
 
-    self.tasks[task.name.lower()] = task
+    self.tasks[task.name] = task
 
 
   def check(self):
