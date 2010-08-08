@@ -8,17 +8,25 @@ def insert_error_tests():
   import glob
   import pdb
   import os.path
+  from buggery.exceptions import UserError
+  from buggery import Parser
 
-  for filename in glob.glob(__path__[0] + "/errors/*"):
+  for filename in glob.glob(__path__[0] + "/errors/*.bgr"):
     name = "test_" + os.path.basename(filename)
     contents = file(filename).read()
 
-    @raises(Exception)
-    def func():
-      Parser.parse(contents)
+    # A function to generate the test functions we need. If we directly create
+    # the functions, they'll all bind to the same variable `contents`, which
+    # is not what we want.
+    def gen_func(param):
+      @raises(UserError)
+      def func():
+        Parser().parse(param)
 
-    func.__name__ = name
-    globals()[name] = func
+      func.__name__ = name
+      return func
+
+    globals()[name] = gen_func(contents)
 
 insert_error_tests()
 

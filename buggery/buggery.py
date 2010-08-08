@@ -403,12 +403,6 @@ class Buggery(Node):
 #raise Exception("Undefined task: " + name)
 #raise Exception("No top-level task named: " + name)
 
-from nose.tools import raises
-@raises(UserError)
-def test_no_subtasks():
-  Parser().parse('mytask:\n')
-
-
 def right_number_of_params():
   raise Exception
 
