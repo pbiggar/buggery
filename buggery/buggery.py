@@ -5,13 +5,7 @@ from pprint import pprint
 import ply.lex as lex
 import ply.yacc as yacc
 from lcdict import lcdict
-
-
-class UserError(Exception):
-  pass
-
-class WhatToDo(Exception):
-  pass
+from exceptions import UserError
 
 
 class Parser(object):
@@ -284,7 +278,7 @@ class Parser(object):
 
     def t_error(p):
       print p
-      sys.exit(1)
+      raise UserError()
 
     def column_number(input, lexpos):
       last_cr = input.rfind('\n', 0, lexpos)
@@ -397,10 +391,10 @@ class Buggery(Node):
   def check(self):
     self.traverse("_check", self)
 
+    if len(self.tasks) == 0:
+      raise UserError("No tasks defined")
 
-#raise Exception("Task already exists: " + name)
-#raise Exception("Subtask has no task:" + subtask)
-#raise Exception("Undefined task: " + name)
+
 #raise Exception("No top-level task named: " + name)
 
 def right_number_of_params():
