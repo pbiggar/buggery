@@ -77,27 +77,22 @@ else:
 input = file(filename).read()
 
 # Parse the buggery file
-parser = Parser()
-ast = parser.parse(input)
-sys.exit(1)
-
+bugger = Parser().parse(input)
 
 ##############################################
 # Process post-reading command-line options
 ##############################################
 if options.list:
-  print ast.top_level_task_list()
+  print bugger.top_level_task_list()
 
 if options.full_list:
-  print ast.task_list()
+  print bugger.task_list()
 
 
 ##############################################
 # Start processing tasks
 ##############################################
 
-ast.check()
-
 # Always run the startup task
-ast.run_top_level_task("startup")
-ast.run_top_level_task(task)
+bugger.run("startup")
+bugger.run(task)

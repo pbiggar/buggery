@@ -356,12 +356,18 @@ class Assignment(Subtask):
     self.rvalue = rvalue
 
 
+  def run(self, buggery):
+    return self.rvalue.run(buggery)
+
+
 class Command(Subtask):
   def __init__(self, command):
     self.command = command
 
   def run(self, buggery):
-    subprocess.call(self.command)
+    args = self.command.split(' ')
+    print args
+    subprocess.call(args)
 
 
 class Call(Subtask):
