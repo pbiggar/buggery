@@ -6,6 +6,8 @@ import ply.lex as lex
 import ply.yacc as yacc
 from lcdict import lcdict
 from exceptions import UserError
+from nose.tools import raises
+import subprocess
 
 
 class Parser(object):
@@ -75,7 +77,7 @@ class Parser(object):
     # Put this before TASKNAME
     def t_COMMAND(t):
       r'\$\s\S[^\n]*' # Starts with '$ ' then a character, and goes to the end of the line.
-      t.value = t.value[2:]
+      t.value = Command(t.value[2:])
       return t
 
     # A task must flush left, be comprised entirely of lower-case letters and
@@ -294,6 +296,7 @@ class Parser(object):
     parser = yacc.yacc(debug=debug)
     buggery = parser.parse(input, debug=debug)
     buggery.check()
+    return buggery
 
 
 # Abstract classes
@@ -342,7 +345,12 @@ class Task(Node):
       raise UserError ("Task %s has no subtasks" % self.name)
 
 
-class Assignment(Node):
+  def run(self, buggery):
+    for task in self.subtasks:
+      task.run(buggery)
+
+
+class Assignment(Subtask):
   def __init__(self, lvalue, rvalue):
     self.lvalue = lvalue
     self.rvalue = rvalue
@@ -351,6 +359,9 @@ class Assignment(Node):
 class Command(Subtask):
   def __init__(self, command):
     self.command = command
+
+  def run(self, buggery):
+    subprocess.call(self.command)
 
 
 class Call(Subtask):
@@ -395,12 +406,26 @@ class Buggery(Node):
       raise UserError("No tasks defined")
 
 
+  def run(self, taskname):
+    if taskname not in self.tasks:
+      raise UserError ("No task '%s' defined" % taskname)
+
+    task = self.tasks[taskname]
+    task.run(self)
+
+
+
 #raise Exception("No top-level task named: " + name)
+# TODO: lots of test cases which don't raise, and which can be successfully parsed
+def simple_buggery():
+  return Parser().parse("mytask:\n  $ ls")
 
-def right_number_of_params():
-  raise Exception
+@raises(UserError)
+def test_undefined_task():
+  simple_buggery().run("undef task")
 
-def simple_task():
-  raise Exception
+def test_simple():
+  simple_buggery().run("mytask")
 
 # TODO: lost of case sensitive stuff. Everything must be lower case, except the first letter of top-level task definitions
+# TODO: lots of bad naming. spaces, illegal chars,  etc.
