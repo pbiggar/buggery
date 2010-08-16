@@ -8,6 +8,7 @@ from lcdict import lcdict
 from exceptions import UserError
 from nose.tools import raises
 import subprocess
+import shlex
 
 
 class Parser(object):
@@ -365,9 +366,13 @@ class Command(Subtask):
     self.command = command
 
   def run(self, buggery):
-    args = self.command.split(' ')
-    print args
-    subprocess.call(args)
+    args = shlex.split(self.command)
+    proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    proc.wait()
+    result = ProcData(proc.stdout, proc.returncode, proc.stderr)
+    if proc.returncode != 0:
+      raise CommandError(result)
+    return result
 
 
 class Call(Subtask):
@@ -420,6 +425,20 @@ class Buggery(Node):
     task.run(self)
 
 
+class Data(object):
+  pass
+
+class ProcData(Data):
+  def __init__(self, stdout, exitcode, stderr):
+    self.stdout = stdout
+    self.exitcode = exitcode
+    self.stderr = stderr
+
+class StringData(Data):
+  pass
+
+class IntData(Data):
+  pass
 
 #raise Exception("No top-level task named: " + name)
 # TODO: lots of test cases which don't raise, and which can be successfully parsed
