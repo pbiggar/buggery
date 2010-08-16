@@ -12,10 +12,8 @@ More resources
 ==============================
 
 introduction.md:  a longer introduction, including a code sample.
-tutorial.md:      a five minute lessn of everything you need to know
+tutorial.md:      a five minute lesson with everything you need to know
 faq.md:           Questions and answers.
-reference.md:     In depth language reference. Read only if you have a question.
-
 
 ==============================
 Contact
