@@ -1,3 +1,5 @@
+#!./bugger
+
 # This file is a DSL- TODO convert to yaml
 # Each task contains a list of subtasks.
 # Sub-tasks starting with $ are shell commands.
