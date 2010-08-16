@@ -95,4 +95,4 @@ if options.full_list:
 
 # Always run the startup task
 bugger.run("startup")
-bugger.run(task)
+bugger.run(args[0])

@@ -73,6 +73,7 @@ class Parser(object):
     # TODO: this doesn't allow escaping of strings, nor single-quoted strings.
     def t_STRING(t):
       r'"[^"]*"'
+      t.value = StringData(t.value)
       return t
 
     # Put this before TASKNAME
@@ -356,9 +357,9 @@ class Assignment(Subtask):
     self.lvalue = lvalue
     self.rvalue = rvalue
 
-
   def run(self, buggery):
-    return self.rvalue.run(buggery)
+    result = self.rvalue.run(buggery)
+    buggery.locals()[self.lvalue] = result
 
 
 class Command(Subtask):
@@ -380,6 +381,9 @@ class Call(Subtask):
     self.target = target
     self.args = args
 
+  def run(self, buggery):
+    return buggery.run
+
   def _check(self, buggery):
     if self.target not in buggery.tasks:
       raise UserError("Task %s not defined" % self.target)
@@ -398,6 +402,7 @@ class Buggery(Node):
   def __init__(self, task_list):
     self.tasks = lcdict()
     self.add_tasks (task_list)
+    self.stack = []
 
   def add_tasks(self, task_list):
     for t in task_list:
@@ -416,13 +421,23 @@ class Buggery(Node):
     if len(self.tasks) == 0:
       raise UserError("No tasks defined")
 
+  class StackFrame(dict):
+    pass
+
 
   def run(self, taskname):
     if taskname not in self.tasks:
       raise UserError ("No task '%s' defined" % taskname)
 
     task = self.tasks[taskname]
-    task.run(self)
+    self.stack.insert(0, self.StackFrame())
+    result = task.run(self)
+    self.stack.pop(0)
+    return result
+
+  def locals(self):
+    return self.stack[0]
+
 
 
 class Data(object):
@@ -435,7 +450,11 @@ class ProcData(Data):
     self.stderr = stderr
 
 class StringData(Data):
-  pass
+  def __init__(self, string):
+    self.string = string
+
+  def run(self, buggery): # TODO: should be called something like eval
+    return self
 
 class IntData(Data):
   pass
