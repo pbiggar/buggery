@@ -38,11 +38,10 @@ def parse_command_line():
 (options, args) = parse_command_line()
 filename = args[1] # The buggery file is always the first command
 args = args[2:]
-
 print "Running %s with args %s" % (filename, str(args))
-input = file(filename).read()
 
 # Parse the buggery file
+input = file(filename).read()
 bugger = Parser().parse(input)
 
 ##############################################
