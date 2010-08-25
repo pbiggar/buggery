@@ -34,6 +34,7 @@ except ImportError, e:
 
 def parse_command_line():
   parser = OptionParser()
+  parser.add_option("-v", "--verbose", dest="verbose", action="store_true", default=False)
   return parser.parse_args(sys.argv)
 
 
@@ -48,6 +49,7 @@ def main():
     sys.exit("No filename given")
   input = file(filename).read()
   bugger = Parser().parse(input)
+  bugger.options = options
 
 ##############################################
 # Process post-reading command-line options
@@ -66,7 +68,7 @@ def main():
     sys.exit(0)
 
 # Always run the startup task
-  bugger.run("startup", [])
+  bugger.run("startup", [], True)
   bugger.run(command, args)
 
 

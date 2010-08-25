@@ -10,6 +10,7 @@ from nose.tools import raises
 import subprocess
 import shlex
 import inspect
+import re
 
 
 class Parser(object):
@@ -59,7 +60,10 @@ class Parser(object):
   Lists are wrapped in tuples as in: ('param-list' [('param', ...), ('param', ...)])
 
   """
-
+  ID_syntax = r'[A-Za-z][a-zA-Z0-9\-]*'
+  var_syntax = r'[A-Z][A-Z0-9\-]*'
+  subtask_syntax = r'[a-z][a-z0-9\-]*'
+  task_syntax = r'[A-Za-z][a-z\-]*'
 
   def parse(self, input):
     tokens = (
@@ -74,7 +78,7 @@ class Parser(object):
     # TODO: this doesn't allow escaping of strings, nor single-quoted strings.
     def t_STRING(t):
       r'"[^"]*"'
-      t.value = StringData(t.value)
+      t.value = StringData(t.value[1:-1])
       return t
 
     # Put this before TASKNAME
@@ -87,6 +91,8 @@ class Parser(object):
     # hyphens (no CamelCase allowed), and may optionally start with an
     # upper-case letter to indicate top-level tasks. Underscores are not
     # allowed.
+    # TODO: make tests for correct ID usage.
+
     def t_ID(t):
       r'[A-Za-z][a-zA-Z0-9\-]*'
       return t
@@ -276,9 +282,9 @@ class Parser(object):
 
     def p_variable(p):
       """
-        variable : '$' ID
+        variable : ID
       """
-      p[0] = Variable(p[2])
+      p[0] = Variable(p[1])
 
 
 
@@ -360,7 +366,7 @@ class BuggeryTask(Task):
         raise UserError("Null is not a valid value")
 
       print "Copying actual %s to formal %s" % (actual, p)
-      buggery.locals()[p] = actual
+      buggery.set_var(p, actual)
 
 
     # Run subtasks
@@ -380,7 +386,7 @@ class PythonTask(Task):
     self.function = function
 
   def run(self, buggery, actuals):
-    return self.function(actuals)
+    return self.function(*actuals)
 
 
 
@@ -393,7 +399,7 @@ class Assignment(Subtask):
 
   def eval(self, buggery):
     result = self.rvalue.eval(buggery)
-    buggery.locals()[self.lvalue] = result
+    buggery.set_var(self.lvalue, result)
 
 
 class Command(Subtask):
@@ -401,11 +407,17 @@ class Command(Subtask):
     self.command = command
 
   def eval(self, buggery):
-    proc = subprocess.Popen(self.command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+
+    command = buggery.interpolate (self.command)
+
+    if buggery.options.verbose:
+      print "Eval: " + command
+
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     proc.wait()
     (stdout, stderr) = proc.communicate()
 
-    result = ProcData(command=self.command,
+    result = ProcData(command=command,
                       stdin=None,
                       stdout=stdout,
                       stderr=stderr,
@@ -426,7 +438,7 @@ class Call(Subtask):
     actuals = []
     for arg in self.args:
       if isinstance(arg, Variable):
-        actuals.append(buggery.locals()[arg.name].eval(buggery))
+        actuals.append(buggery.get_var(arg.name).eval(buggery))
       else:
         raise TODO()
 
@@ -454,11 +466,16 @@ class Buggery(Node):
     self.tasks = lcdict()
     self.add_tasks (task_list)
     self.stack = []
+    self.globals = self.StackFrame()
     self.add_builtins()
+
+    self.options = object()
+
 
   def add_tasks(self, task_list):
     for t in task_list:
       self.add_task(t)
+
 
   def add_task(self, task):
     if task.name in self.tasks:
@@ -476,14 +493,15 @@ class Buggery(Node):
     pass
 
 
-  def run(self, taskname, args):
+  def run(self, taskname, args, use_globals = False):
     if taskname not in self.tasks:
       raise UserError ("No task '%s' defined" % taskname)
 
     task = self.tasks[taskname]
 
     # New stackframe and copy parameters
-    self.stack.insert(0, self.StackFrame())
+    frame = self.StackFrame() if not use_globals else self.globals
+    self.stack.insert(0, frame)
 
     # Run the task itself
     result = task.run(self, args)
@@ -494,10 +512,24 @@ class Buggery(Node):
     return result
 
 
+  def get_var(self, name):
+    if name in self.globals:
+      return self.globals[name]
 
+    return self.stack[0][name]
 
-  def locals(self):
-    return self.stack[0]
+  # There's no need for checking here, since all variable and global names are statically known, and can be statically checked.
+  def set_var(self, name, value):
+    self.stack[0][name] = value
+
+  def interpolate(self, string):
+    # TODO handle complex interpolation ("@{...}")
+
+    # For string interpolation, using the @ symbol. A regex is sufficient for this.
+    return re.sub(r'@' + Parser.var_syntax + '',
+                  lambda m: self.get_var(m.group(0)[1:]),
+                  string)
+
 
   def help_string(self):
     result = "Available tasks:\n\n"
@@ -508,9 +540,8 @@ class Buggery(Node):
     return result
 
   def add_builtins(self):
-    def my_print (*args):
-      for arg in args:
-        print arg
+    def my_print (string):
+      print string
 
     self.add_task (PythonTask("print", my_print))
 
@@ -541,7 +572,8 @@ class StringData(Data):
     self.string = string
 
   def eval(self, buggery):
-    """Get actual value. TODO: This should perform interpolation."""
+    """Get actual value. This performs interpolation."""
+    self.string = buggery.interpolate(self.string)
     return self.string
 
 
@@ -553,10 +585,10 @@ def simple_buggery():
 
 @raises(UserError)
 def test_undefined_task():
-  simple_buggery().run("undef task")
+  simple_buggery().run("undef_task", [])
 
 def test_simple():
-  simple_buggery().run("mytask")
+  simple_buggery().run("mytask", [])
 
 # TODO: lost of case sensitive stuff. Everything must be lower case, except the first letter of top-level task definitions
 # TODO: lots of bad naming. spaces, illegal chars,  etc.
