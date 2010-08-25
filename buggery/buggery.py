@@ -75,10 +75,12 @@ class Parser(object):
 
     literals = ":,=()$"
 
-    # TODO: this doesn't allow escaping of strings, nor single-quoted strings.
     def t_STRING(t):
-      r'"[^"]*"'
-      t.value = StaticString(t.value[1:-1])
+      r'"(\\.|[^\\"])*"'
+      val = t.value[1:-1]
+      val = re.sub(r'\\n', "\n", val);
+      val = re.sub(r'\\t', "\t", val);
+      t.value = StaticString(val)
       return t
 
     # Put this before TASKNAME
