@@ -78,7 +78,7 @@ class Parser(object):
     # TODO: this doesn't allow escaping of strings, nor single-quoted strings.
     def t_STRING(t):
       r'"[^"]*"'
-      t.value = StringData(t.value[1:-1])
+      t.value = StaticString(t.value[1:-1])
       return t
 
     # Put this before TASKNAME
@@ -386,10 +386,11 @@ class PythonTask(Task):
     self.function = function
 
   def run(self, buggery, actuals):
-    return self.function(*actuals)
+    vals = [actual.as_string() for actual in actuals]
+    return self.function(*vals)
 
 
-
+# eval always returns a Data object
 
 
 class Assignment(Subtask):
@@ -407,7 +408,6 @@ class Command(Subtask):
     self.command = command
 
   def eval(self, buggery):
-
     command = buggery.interpolate (self.command)
 
     if buggery.options.verbose:
@@ -435,13 +435,7 @@ class Call(Subtask):
     self.args = args
 
   def eval(self, buggery):
-    actuals = []
-    for arg in self.args:
-      if isinstance(arg, Variable):
-        actuals.append(buggery.get_var(arg.name).eval(buggery))
-      else:
-        raise TODO()
-
+    actuals = [arg.eval(buggery) for arg in self.args]
     return buggery.run(self.target, actuals)
 
 
@@ -450,9 +444,22 @@ class Call(Subtask):
       raise UserError("Task %s not defined" % self.target)
 
 
+class StaticString(Subtask):
+  def __init__(self, string):
+    self.string = string
+
+  def eval(self, buggery):
+    return StringData(buggery.interpolate(self.string))
+
+
+
 class Variable(Node):
   def __init__(self, name):
     self.name = name
+
+  def eval(self, buggery):
+    return buggery.get_var(self.name)
+
 
 
 class Param(Node):
@@ -527,7 +534,7 @@ class Buggery(Node):
 
     # For string interpolation, using the @ symbol. A regex is sufficient for this.
     return re.sub(r'@' + Parser.var_syntax + '',
-                  lambda m: self.get_var(m.group(0)[1:]),
+                  lambda m: self.get_var(m.group(0)[1:]).as_string(),
                   string)
 
 
@@ -563,17 +570,22 @@ class ProcData(Data):
     self.pid = pid
 
   def eval(self, buggery):
-    """Get actual value. This returns stdout."""
+    return self
+
+  def as_string(self):
     return self.stdout
 
 
 class StringData(Data):
   def __init__(self, string):
+    assert (isinstance(string, str))
     self.string = string
 
   def eval(self, buggery):
     """Get actual value. This performs interpolation."""
-    self.string = buggery.interpolate(self.string)
+    return buggery.interpolate(self.string)
+
+  def as_string (self):
     return self.string
 
 
