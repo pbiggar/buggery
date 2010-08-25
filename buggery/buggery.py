@@ -5,10 +5,11 @@ from pprint import pprint
 import ply.lex as lex
 import ply.yacc as yacc
 from lcdict import lcdict
-from exceptions import UserError
+from exceptions import UserError, CommandError
 from nose.tools import raises
 import subprocess
 import shlex
+import inspect
 
 
 class Parser(object):
@@ -110,10 +111,12 @@ class Parser(object):
       pass
 
 
-
+    def t_error(t):
+      print "Lexing error (line %d): %s" % (t.lineno, str (t.__dict__))
+      raise UserError()
 
     def p_error(p):
-      print p.__dict__
+      print "Parsing error (line %d): %s" % (p.lineno, str (p.__dict__))
       raise UserError()
 
 
@@ -155,7 +158,7 @@ class Parser(object):
         params = p[3]
         subtasks = p[6]
 
-      p[0] = Task (name, params, subtasks)
+      p[0] = BuggeryTask (name, params, subtasks)
       if self.debug:
         print ("Completed a task:\n" + pprint.pformat(p[0]))
 
@@ -213,11 +216,11 @@ class Parser(object):
              | ID
       """
       name = p[1]
-      params = []
-      if len(p) == 4:
-        params = p[3]
+      args = []
+      if len(p) > 2:
+        args = p[3]
 
-      p[0] = Call(name, params)
+      p[0] = Call(name, args)
 
 
     def p_arg_list(p):
@@ -280,10 +283,6 @@ class Parser(object):
 
 
 
-    def t_error(p):
-      print p
-      raise UserError()
-
     def column_number(input, lexpos):
       last_cr = input.rfind('\n', 0, lexpos)
       if last_cr < 0:
@@ -336,10 +335,37 @@ class Subtask(Node):
 
 # Concrete classes
 class Task(Node):
-  def __init__(self, name, params, subtasks):
+  def __init__(self, name):
     self.name = name
+
+
+
+class BuggeryTask(Task):
+
+  def __init__(self, name, params, subtasks):
+    super(BuggeryTask, self).__init__(name)
     self.params = params
     self.subtasks = subtasks
+
+
+  def run(self, buggery, actuals):
+
+    # Copy the parameters into the stack frame
+    for p in self.params:
+      actual = actuals.pop(0)
+      if actual == None:
+        actual = p.default_value
+
+      if actual == None:
+        raise UserError("Null is not a valid value")
+
+      print "Copying actual %s to formal %s" % (actual, p)
+      buggery.locals()[p] = actual
+
+
+    # Run subtasks
+    for subtask in self.subtasks:
+      subtask.eval(buggery)
 
 
   def _check(self, buggery):
@@ -347,9 +373,17 @@ class Task(Node):
       raise UserError ("Task %s has no subtasks" % self.name)
 
 
-  def run(self, buggery):
-    for task in self.subtasks:
-      task.run(buggery)
+
+class PythonTask(Task):
+  def __init__(self, name, function):
+    super(PythonTask, self).__init__(name)
+    self.function = function
+
+  def run(self, buggery, actuals):
+    return self.function(actuals)
+
+
+
 
 
 class Assignment(Subtask):
@@ -357,8 +391,8 @@ class Assignment(Subtask):
     self.lvalue = lvalue
     self.rvalue = rvalue
 
-  def run(self, buggery):
-    result = self.rvalue.run(buggery)
+  def eval(self, buggery):
+    result = self.rvalue.eval(buggery)
     buggery.locals()[self.lvalue] = result
 
 
@@ -366,11 +400,18 @@ class Command(Subtask):
   def __init__(self, command):
     self.command = command
 
-  def run(self, buggery):
-    args = shlex.split(self.command)
-    proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+  def eval(self, buggery):
+    proc = subprocess.Popen(self.command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     proc.wait()
-    result = ProcData(proc.stdout, proc.returncode, proc.stderr)
+    (stdout, stderr) = proc.communicate()
+
+    result = ProcData(command=self.command,
+                      stdin=None,
+                      stdout=stdout,
+                      stderr=stderr,
+                      exit_code=proc.returncode,
+                      pid=proc.pid)
+
     if proc.returncode != 0:
       raise CommandError(result)
     return result
@@ -381,16 +422,26 @@ class Call(Subtask):
     self.target = target
     self.args = args
 
-  def run(self, buggery):
-    return buggery.run
+  def eval(self, buggery):
+    actuals = []
+    for arg in self.args:
+      if isinstance(arg, Variable):
+        actuals.append(buggery.locals()[arg.name].eval(buggery))
+      else:
+        raise TODO()
+
+    return buggery.run(self.target, actuals)
+
 
   def _check(self, buggery):
     if self.target not in buggery.tasks:
       raise UserError("Task %s not defined" % self.target)
 
+
 class Variable(Node):
   def __init__(self, name):
     self.name = name
+
 
 class Param(Node):
   def __init__(self, name, default):
@@ -403,6 +454,7 @@ class Buggery(Node):
     self.tasks = lcdict()
     self.add_tasks (task_list)
     self.stack = []
+    self.add_builtins()
 
   def add_tasks(self, task_list):
     for t in task_list:
@@ -414,7 +466,6 @@ class Buggery(Node):
 
     self.tasks[task.name] = task
 
-
   def check(self):
     self.traverse("_check", self)
 
@@ -425,18 +476,46 @@ class Buggery(Node):
     pass
 
 
-  def run(self, taskname):
+  def run(self, taskname, args):
     if taskname not in self.tasks:
       raise UserError ("No task '%s' defined" % taskname)
 
     task = self.tasks[taskname]
+
+    # New stackframe and copy parameters
     self.stack.insert(0, self.StackFrame())
-    result = task.run(self)
+
+    # Run the task itself
+    result = task.run(self, args)
+
+    # Pop the stackframe
     self.stack.pop(0)
+
     return result
+
+
+
 
   def locals(self):
     return self.stack[0]
+
+  def help_string(self):
+    result = "Available tasks:\n\n"
+
+    for task in self.tasks:
+      result += "\t %(task)s\n" % locals()
+
+    return result
+
+  def add_builtins(self):
+    def my_print (*args):
+      for arg in args:
+        print arg
+
+    self.add_task (PythonTask("print", my_print))
+
+
+
 
 
 
@@ -444,20 +523,28 @@ class Data(object):
   pass
 
 class ProcData(Data):
-  def __init__(self, stdout, exitcode, stderr):
+  def __init__(self, command=None, stdin=None, stdout=None, exitcode=None, stderr=None, pid=None, exit_code=None):
+    self.command = command
+    self.stdin = stdin
     self.stdout = stdout
-    self.exitcode = exitcode
     self.stderr = stderr
+    self.exit_code = exit_code
+    self.pid = pid
+
+  def eval(self, buggery):
+    """Get actual value. This returns stdout."""
+    return self.stdout
+
 
 class StringData(Data):
   def __init__(self, string):
     self.string = string
 
-  def run(self, buggery): # TODO: should be called something like eval
-    return self
+  def eval(self, buggery):
+    """Get actual value. TODO: This should perform interpolation."""
+    return self.string
 
-class IntData(Data):
-  pass
+
 
 #raise Exception("No top-level task named: " + name)
 # TODO: lots of test cases which don't raise, and which can be successfully parsed

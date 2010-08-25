@@ -7,6 +7,7 @@ import os
 import glob
 import re
 from optparse import OptionParser # use optparse rather than argparse since it's portable between versions, not just 2.7 and beyond.
+from buggery.exceptions import CommandError
 
 
 try:
@@ -35,14 +36,18 @@ def parse_command_line():
   parser = OptionParser()
   return parser.parse_args(sys.argv)
 
-(options, args) = parse_command_line()
-filename = args[1] # The buggery file is always the first command
-args = args[2:]
-print "Running %s with args %s" % (filename, str(args))
 
-# Parse the buggery file
-input = file(filename).read()
-bugger = Parser().parse(input)
+def main():
+  (options, args) = parse_command_line()
+  filename = args[1] if len(args) > 1 else None
+  command  = args[2] if len(args) > 2 else None
+  args = args[3:]
+
+  # Parse the buggery file
+  if filename == None:
+    sys.exit("No filename given")
+  input = file(filename).read()
+  bugger = Parser().parse(input)
 
 ##############################################
 # Process post-reading command-line options
@@ -53,5 +58,31 @@ bugger = Parser().parse(input)
 # Start processing tasks
 ##############################################
 
+  if command == None:
+    command = "help"
+
+  if command == "help":
+    print bugger.help_string()
+    sys.exit(0)
+
 # Always run the startup task
-bugger.run("startup")
+  bugger.run("startup", [])
+  bugger.run(command, args)
+
+
+if __name__ == "__main__":
+  try:
+    main()
+  except CommandError, e:
+    print """A command has failed:
+  command:   %s
+  stdin:     %s
+  stdout:    '%s'
+  stderr:    '%s'
+  exit code: %d
+  pid:       %d
+""" % (e.proc.command, e.proc.stdin, e.proc.stdout, e.proc.stderr, e.proc.exit_code, e.proc.pid)
+
+
+  # Don't catch UserErrors yet
+

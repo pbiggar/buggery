@@ -18,9 +18,6 @@ Startup:
 ##############################
 # Task lists
 ##############################
-Default:
-  full
-
 Quick:
   compile, trace-test, sunspider, ubench
 
