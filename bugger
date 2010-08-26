@@ -7,7 +7,7 @@ import os
 import glob
 import re
 from optparse import OptionParser # use optparse rather than argparse since it's portable between versions, not just 2.7 and beyond.
-from buggery.exceptions import CommandError
+from buggery.exceptions import CommandError, UserError
 
 
 try:
@@ -73,6 +73,7 @@ def main():
 
 
 if __name__ == "__main__":
+  e = None
   try:
     main()
   except CommandError, e:
@@ -84,6 +85,10 @@ if __name__ == "__main__":
   exit code: %d
   pid:       %d
 """ % (e.proc.command, e.proc.stdin, e.proc.stdout, e.proc.stderr, e.proc.exit_code, e.proc.pid)
+  except UserError, e:
+    print e.message
+    raise
+
 
 
   # Don't catch UserErrors yet

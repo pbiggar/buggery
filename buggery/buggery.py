@@ -60,10 +60,10 @@ class Parser(object):
   Lists are wrapped in tuples as in: ('param-list' [('param', ...), ('param', ...)])
 
   """
-  ID_syntax = r'[A-Za-z][a-zA-Z0-9\-]*'
-  var_syntax = r'[A-Z][A-Z0-9\-]*'
-  subtask_syntax = r'[a-z][a-z0-9\-]*'
-  task_syntax = r'[A-Za-z][a-z\-]*'
+  ID_syntax = r'[A-Za-z][a-zA-Z0-9_]*'
+  var_syntax = r'[A-Z][A-Z0-9_]*'
+  subtask_syntax = r'[a-z][a-z0-9_]*'
+  task_syntax = r'[A-Za-z][a-z_]*'
 
   def parse(self, input):
     tokens = (
@@ -96,7 +96,7 @@ class Parser(object):
     # TODO: make tests for correct ID usage.
 
     def t_ID(t):
-      r'[A-Za-z][a-zA-Z0-9\-]*'
+      r'[A-Za-z][a-zA-Z0-9_]*'
       return t
 
     def t_INDENT(t):
@@ -120,12 +120,10 @@ class Parser(object):
 
 
     def t_error(t):
-      print "Lexing error (line %d): %s" % (t.lineno, str (t.__dict__))
-      raise UserError()
+      raise UserError("Lexing error (line %d): %s" % (t.lineno, str (t.__dict__)))
 
     def p_error(p):
-      print "Parsing error (line %d): %s" % (p.lineno, str (p.__dict__))
-      raise UserError()
+      raise UserError("Parsing error (line %d): %s" % (p.lineno, str (p.__dict__)))
 
 
     def p_file(p):
@@ -358,22 +356,29 @@ class BuggeryTask(Task):
 
   def run(self, buggery, actuals):
 
+    if buggery.options.verbose:
+      print "Eval: %s(%s)" % (self.name, str([a.as_string() for a in actuals])[1:-1])
+
     # Copy the parameters into the stack frame
     for p in self.params:
       actual = actuals.pop(0)
       if actual == None:
-        actual = p.default_value
+        actual = p.default
 
       if actual == None:
         raise UserError("Null is not a valid value")
 
-      print "Copying actual %s to formal %s" % (actual, p)
-      buggery.set_var(p, actual)
-
+      buggery.set_var(p.name, actual)
 
     # Run subtasks
     for subtask in self.subtasks:
       subtask.eval(buggery)
+
+    # There may not be a key. Ignore it so.
+    try:
+      return buggery.get_var("RETVAL")
+    except:
+      pass
 
 
   def _check(self, buggery):
