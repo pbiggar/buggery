@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import sys
-from pprint import pprint
+import pprint
 import ply.lex as lex
 import ply.yacc as yacc
 from lcdict import lcdict
@@ -27,7 +27,7 @@ class Parser(object):
     variable := ID
 
     # Subtask declarations
-    subtask := (ID? COMMAND)|(call*)
+    subtask := ID? command|(call*)
     call := ID argument*
     argument := string|variable
 
@@ -85,19 +85,20 @@ class Parser(object):
 
     # Put this before TASKNAME
     def t_COMMAND(t):
-      r'\$\s\S[^\n]*' # Starts with '$ ' then a character, and goes to the end of the line.
-      t.value = Command(t.value[2:])
+      t.value = t.value.strip()
       return t
+    t_COMMAND.__doc__ = r'(?<=\$)\s*(\(' + Parser.var_syntax + r'\))?\s*\S[^\n]*' # Starts with '$', optional parenthesis, and goes to the end of the line.
 
     # A task must flush left, be comprised entirely of lower-case letters and
     # hyphens (no CamelCase allowed), and may optionally start with an
     # upper-case letter to indicate top-level tasks. Underscores are not
     # allowed.
-    # TODO: make tests for correct ID usage.
 
+
+    # TODO: make tests for correct ID usage.
     def t_ID(t):
-      r'[A-Za-z][a-zA-Z0-9_]*'
       return t
+    t_ID.__doc__ = Parser.ID_syntax
 
     def t_INDENT(t):
       r'(?<=\n)\ \ (?=\S)' # Exactly 2 spaces, preceeded by a \n, followed by non-whitespace
@@ -186,16 +187,32 @@ class Parser(object):
     def p_subtask_line(p):
       """
         subtask_line : INDENT lvalue call
-                     | INDENT lvalue COMMAND
+                     | INDENT lvalue command
                      | INDENT lvalue STRING
                      | INDENT call_list
-                     | INDENT COMMAND
+                     | INDENT command
       """
       if len(p) == 3:
         p[0] = p[2] # same for command or subtask_list
 
       else:
         p[0] = Assignment (p[2], p[3])
+
+    def p_command(p):
+      """
+      command : '$' COMMAND
+      """
+      # COMMAND may start with a variable in parens, which is hard to split out with the lexer. So do it here.
+      # TODO: I'm starting to need an Expr here: there are tons of places which could do with it, like interpolation, etc.
+      command = p[2]
+      stdin = None
+      if command[0] == '(':
+        m = re.match(r'\(\s*(' + Parser.var_syntax + ')\s*\)?(.*)', command)
+
+        stdin = m.group(1).strip()
+        command = m.group(2).strip()
+
+      p[0] = Command(command, stdin)
 
 
     def p_lvalue(p):
@@ -357,13 +374,19 @@ class BuggeryTask(Task):
   def run(self, buggery, actuals):
 
     if buggery.options.verbose:
-      print "Eval: %s(%s)" % (self.name, str([a.as_string() for a in actuals])[1:-1])
+      str_actuals = [a.as_string() for a in actuals]
+      str_actuals = [a if len(a) < 80 else a[0:77] + '...' for a in str_actuals]
+      print "Eval: %s(%s)" % (self.name, str(str_actuals)[1:-1])
 
     # Copy the parameters into the stack frame
     for p in self.params:
-      actual = actuals.pop(0)
-      if actual == None:
-        actual = p.default
+      try:
+        actual = actuals.pop(0)
+      except IndexError:
+        if p.default:
+          actual = p.default.eval(buggery)
+        else:
+          raise UserError("Less parameters than expected")
 
       if actual == None:
         raise UserError("Null is not a valid value")
@@ -411,8 +434,9 @@ class Assignment(Subtask):
 
 
 class Command(Subtask):
-  def __init__(self, command):
+  def __init__(self, command, stdin_var):
     self.command = command
+    self.stdin_var = stdin_var
 
   def eval(self, buggery):
     command = buggery.interpolate (self.command)
@@ -420,14 +444,18 @@ class Command(Subtask):
     if buggery.options.verbose:
       print "Eval: " + command
 
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    proc.wait()
-    (stdout, stderr) = proc.communicate()
+    stdin_str, stdin_proc = None, None
+    if self.stdin_var:
+      stdin_str = buggery.get_var(self.stdin_var).as_string()
+      stdin_proc = subprocess.PIPE
+
+    proc = subprocess.Popen(command, stdin=stdin_proc, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    (stdout, stderr) = proc.communicate(stdin_str)
 
     result = ProcData(command=command,
-                      stdin=None,
-                      stdout=stdout,
-                      stderr=stderr,
+                      stdin=stdin_str,
+                      stdout=stdout.strip(),
+                      stderr=stderr.strip(),
                       exit_code=proc.returncode,
                       pid=proc.pid)
 
@@ -554,10 +582,14 @@ class Buggery(Node):
     return result
 
   def add_builtins(self):
-    def my_print (string):
+    def builtin_print (string):
       print string
 
-    self.add_task (PythonTask("print", my_print))
+    def builtin_save(string, filename):
+      file(filename, 'w').write(string)
+
+    self.add_task (PythonTask("print", builtin_print))
+    self.add_task (PythonTask("save", builtin_save))
 
 
 

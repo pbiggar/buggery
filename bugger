@@ -8,6 +8,7 @@ import glob
 import re
 from optparse import OptionParser # use optparse rather than argparse since it's portable between versions, not just 2.7 and beyond.
 from buggery.exceptions import CommandError, UserError
+import buggery
 
 
 try:
@@ -42,7 +43,7 @@ def main():
   (options, args) = parse_command_line()
   filename = args[1] if len(args) > 1 else None
   command  = args[2] if len(args) > 2 else None
-  args = args[3:]
+  args = [buggery.buggery.StringData(arg) for arg in args[3:]]
 
   # Parse the buggery file
   if filename == None:
@@ -69,7 +70,9 @@ def main():
 
 # Always run the startup task
   bugger.run("startup", [], True)
-  bugger.run(command, args)
+  result = bugger.run(command, args)
+  if result != None:
+    print result.as_string()
 
 
 if __name__ == "__main__":
@@ -77,14 +80,41 @@ if __name__ == "__main__":
   try:
     main()
   except CommandError, e:
+
+    def shorten(name, string):
+      if string == None:
+        return None
+
+      # If it goes beyond one line, or is very long, truncate it and write it to a file.
+      new_string = string
+      write_to_file = False
+      if '\n' in new_string:
+        write_to_file = True
+        new_string = new_string[0:new_string.index('\n')]
+
+      if len(new_string) > 160:
+        write_to_file = True
+
+      if write_to_file:
+        filename = "bugger-%s.txt" % name
+        file(filename, 'w').write(string)
+        return "See %s => '%s...'" % (filename, new_string[0:40])
+
+      assert new_string == string
+      return "'%s'" % string
+
+    stdin  = shorten("stdin", e.proc.stdin)
+    stdout = shorten("stdout", e.proc.stdout)
+    stderr = shorten("stderr", e.proc.stderr)
+
     print """A command has failed:
   command:   %s
   stdin:     %s
-  stdout:    '%s'
-  stderr:    '%s'
+  stdout:    %s
+  stderr:    %s
   exit code: %d
   pid:       %d
-""" % (e.proc.command, e.proc.stdin, e.proc.stdout, e.proc.stderr, e.proc.exit_code, e.proc.pid)
+""" % (e.proc.command, stdin, stdout, stderr, e.proc.exit_code, e.proc.pid)
   except UserError, e:
     print e.message
     raise
