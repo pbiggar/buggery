@@ -65,7 +65,27 @@ class Parser(object):
   subtask_syntax = r'[a-z][a-z0-9_]*'
   task_syntax = r'[A-Za-z][a-z_]*'
 
+
   def parse(self, input):
+
+    # Keep track of line numbers and such
+    def column_number(lexpos):
+      last_cr = input.rfind('\n', 0, lexpos)
+      if last_cr < 0:
+        last_cr = 0
+      column = (lexpos - last_cr)
+      return column
+
+    def add_token_cursor(t):
+      if not isinstance(t.value, str):
+        t.value.lineno = 'todo'
+        t.value.colno = 'todo'
+
+    def add_parser_cursor(p):
+      p[0].lineno = p.lineno(0)
+      p[0].colno = column_number(p.lexpos(0))
+
+
     tokens = (
       'STRING',
       'ID',
@@ -81,11 +101,13 @@ class Parser(object):
       val = re.sub(r'\\n', "\n", val);
       val = re.sub(r'\\t', "\t", val);
       t.value = StaticString(val)
+      add_token_cursor(t)
       return t
 
     # Put this before TASKNAME
     def t_COMMAND(t):
       t.value = t.value.strip()
+      add_token_cursor(t)
       return t
     t_COMMAND.__doc__ = r'(?<=\$)\s*(\(' + Parser.var_syntax + r'\))?\s*\S[^\n]*' # Starts with '$', optional parenthesis, and goes to the end of the line.
 
@@ -97,12 +119,13 @@ class Parser(object):
 
     # TODO: make tests for correct ID usage.
     def t_ID(t):
+      add_token_cursor(t)
       return t
     t_ID.__doc__ = Parser.ID_syntax
 
     def t_INDENT(t):
       r'(?<=\n)\ \ (?=\S)' # Exactly 2 spaces, preceeded by a \n, followed by non-whitespace
-      t.lexer.lineno += 1
+      add_token_cursor(t)
       return t
 
     # Low priority: Throw away the newlines that aren't indents
@@ -132,6 +155,7 @@ class Parser(object):
         file : task_list
       """
       p[0] = Buggery(p[1])
+      add_parser_cursor(p)
 
 
     def p_task_list(p):
@@ -166,6 +190,7 @@ class Parser(object):
         subtasks = p[6]
 
       p[0] = BuggeryTask (name, params, subtasks)
+      add_parser_cursor(p)
       if self.debug:
         print ("Completed a task:\n" + pprint.pformat(p[0]))
 
@@ -197,6 +222,8 @@ class Parser(object):
 
       else:
         p[0] = Assignment (p[2], p[3])
+        add_parser_cursor(p)
+
 
     def p_command(p):
       """
@@ -213,6 +240,7 @@ class Parser(object):
         command = m.group(2).strip()
 
       p[0] = Command(command, stdin)
+      add_parser_cursor(p)
 
 
     def p_lvalue(p):
@@ -244,6 +272,7 @@ class Parser(object):
         args = p[3]
 
       p[0] = Call(name, args)
+      add_parser_cursor(p)
 
 
     def p_arg_list(p):
@@ -255,6 +284,7 @@ class Parser(object):
         p[0] = [p[1]]
       else:
         p[0] = [p[1]] + p[3]
+
 
     def p_arg(p):
       """
@@ -286,6 +316,7 @@ class Parser(object):
         default = p[3]
 
       p[0] = Param(name, default)
+      add_parser_cursor(p)
 
 
     def p_default_param(p):
@@ -295,30 +326,22 @@ class Parser(object):
       p[0] = p[1]
 
 
-
-
     def p_variable(p):
       """
         variable : ID
       """
       p[0] = Variable(p[1])
+      add_parser_cursor(p)
 
 
 
-
-    def column_number(input, lexpos):
-      last_cr = input.rfind('\n', 0, lexpos)
-      if last_cr < 0:
-        last_cr = 0
-      column = (token.lexpos - last_cr) + 1
-      return column
 
 
     debug = False
     self.debug = debug
     lex.lex(debug=debug)
     parser = yacc.yacc(debug=debug)
-    buggery = parser.parse(input, debug=debug)
+    buggery = parser.parse(input, debug=debug, tracking=True)
     buggery.check()
     return buggery
 
@@ -362,7 +385,6 @@ class Task(Node):
     self.name = name
 
 
-
 class BuggeryTask(Task):
 
   def __init__(self, name, params, subtasks):
@@ -370,13 +392,16 @@ class BuggeryTask(Task):
     self.params = params
     self.subtasks = subtasks
 
+  def param_count(self):
+    return len(self.params)
+
 
   def run(self, buggery, actuals):
 
     if buggery.options.verbose:
       str_actuals = [a.as_string() for a in actuals]
       str_actuals = [a if len(a) < 80 else a[0:77] + '...' for a in str_actuals]
-      print "Eval: %s(%s)" % (self.name, str(str_actuals)[1:-1])
+      print "Eval: %s %s" % (self.name, " ".join(str_actuals))
 
     # Copy the parameters into the stack frame
     for p in self.params:
@@ -419,6 +444,10 @@ class PythonTask(Task):
     vals = [actual.as_string() for actual in actuals]
     return self.function(*vals)
 
+  def param_count(self):
+    return self.function.func_code.co_argcount
+
+
 
 # eval always returns a Data object
 
@@ -439,10 +468,10 @@ class Command(Subtask):
     self.stdin_var = stdin_var
 
   def eval(self, buggery):
-    command = buggery.interpolate (self.command)
+    command = buggery.interpolate (self.command, self)
 
     if buggery.options.verbose:
-      print "Eval: " + command
+      print "    $ " + command
 
     stdin_str, stdin_proc = None, None
     if self.stdin_var:
@@ -478,6 +507,11 @@ class Call(Subtask):
     if self.target not in buggery.tasks:
       raise UserError("Task %s not defined" % self.target)
 
+    arg_count = len(self.args)
+    param_count = buggery.tasks[self.target].param_count()
+    if arg_count > param_count:
+      raise UserError("Task %s called with %s arguments, though there are %s parameters" % (self.target, arg_count, param_count), self)
+
 
 class StaticString(Subtask):
   def __init__(self, string):
@@ -493,7 +527,7 @@ class Variable(Node):
     self.name = name
 
   def eval(self, buggery):
-    return buggery.get_var(self.name)
+    return buggery.get_var(self.name, self)
 
 
 
@@ -537,7 +571,7 @@ class Buggery(Node):
 
   def run(self, taskname, args, use_globals = False):
     if taskname not in self.tasks:
-      raise UserError ("No task '%s' defined" % taskname)
+      raise UserError ("No task '%s' defined" % taskname, None)
 
     task = self.tasks[taskname]
 
@@ -554,22 +588,25 @@ class Buggery(Node):
     return result
 
 
-  def get_var(self, name):
+  def get_var(self, name, stateobj=None):
     if name in self.globals:
       return self.globals[name]
 
-    return self.stack[0][name]
+    if name in self.stack[0]:
+      return self.stack[0][name]
+
+    raise UserError ("Unknown variable: %s" % name, stateobj)
 
   # There's no need for checking here, since all variable and global names are statically known, and can be statically checked.
   def set_var(self, name, value):
     self.stack[0][name] = value
 
-  def interpolate(self, string):
+  def interpolate(self, string, stateobj=None):
     # TODO handle complex interpolation ("@{...}")
 
     # For string interpolation, using the @ symbol. A regex is sufficient for this.
     return re.sub(r'@' + Parser.var_syntax + '',
-                  lambda m: self.get_var(m.group(0)[1:]).as_string(),
+                  lambda m: self.get_var(m.group(0)[1:], stateobj).as_string(),
                   string)
 
 
@@ -585,11 +622,17 @@ class Buggery(Node):
     def builtin_print (string):
       print string
 
-    def builtin_save(string, filename):
-      file(filename, 'w').write(string)
+    def builtin_save(filename, string):
+      import os.path
+      file(os.path.expanduser(filename), 'w').write(string)
+
+    def builtin_append(filename, string):
+      import os.path
+      file(os.path.expanduser(filename), 'a').write(string)
 
     self.add_task (PythonTask("print", builtin_print))
     self.add_task (PythonTask("save", builtin_save))
+    self.add_task (PythonTask("append", builtin_append))
 
 
 
