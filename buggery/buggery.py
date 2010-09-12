@@ -144,10 +144,10 @@ class Parser(object):
 
 
     def t_error(t):
-      raise UserError("Lexing error (line %d): %s" % (t.lineno, str (t.__dict__)))
+      raise UserError("Lexing error (line %d): %s" % (t.lineno, str (t.__dict__)), None)
 
     def p_error(p):
-      raise UserError("Parsing error (line %d): %s" % (p.lineno, str (p.__dict__)))
+      raise UserError("Parsing error (line %d): %s" % (p.lineno, str (p.__dict__)), None)
 
 
     def p_file(p):
@@ -478,8 +478,13 @@ class Command(Subtask):
       stdin_str = buggery.get_var(self.stdin_var).as_string()
       stdin_proc = subprocess.PIPE
 
-    proc = subprocess.Popen(command, stdin=stdin_proc, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    (stdout, stderr) = proc.communicate(stdin_str)
+    try:
+      proc = subprocess.Popen(command, stdin=stdin_proc, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+      (stdout, stderr) = proc.communicate(stdin_str)
+    except KeyboardInterrupt, e:
+      # It'll do a CommandError I hope.
+      stdout = proc.stdout.read()
+      stderr = proc.stderr.read()
 
     result = ProcData(command=command,
                       stdin=stdin_str,
@@ -570,6 +575,10 @@ class Buggery(Node):
 
 
   def run(self, taskname, args, use_globals = False):
+
+    if taskname == "startup":
+      use_globals = True
+
     if taskname not in self.tasks:
       raise UserError ("No task '%s' defined" % taskname, None)
 

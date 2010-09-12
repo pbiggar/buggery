@@ -68,12 +68,14 @@ def main():
     print bugger.help_string()
     sys.exit(0)
 
-# Always run the startup task
-  bugger.run("startup", [], True)
-  result = bugger.run(command, args)
-  if result != None:
-    print result.as_string()
+  def run_task(name, args):
+    result = bugger.run(name, args)
+    if result != None:
+      print result.as_string()
 
+  run_task("startup", [])
+  run_task(command, args)
+  run_task("shutdown", [])
 
 if __name__ == "__main__":
   e = None
@@ -112,13 +114,12 @@ if __name__ == "__main__":
   stdin:     %s
   stdout:    %s
   stderr:    %s
-  exit code: %d
-  pid:       %d
+  exit code: %s
+  pid:       %s
 """ % (e.proc.command, stdin, stdout, stderr, e.proc.exit_code, e.proc.pid)
   except UserError, e:
     print ("%s:%s: %s" % (e.line_number(), e.column_number(), e.message))
     raise
-
 
 
   # Don't catch UserErrors yet
