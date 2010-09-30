@@ -1,0 +1,11 @@
+t1:
+  pass, pass
+
+
+t2(A,B):
+  t3(A)
+  t3(B)
+
+t3(A):
+  $ echo ""
+

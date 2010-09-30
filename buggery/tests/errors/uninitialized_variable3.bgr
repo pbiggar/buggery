@@ -1,0 +1,5 @@
+t:
+  b("some string @INTERP")
+
+b(A):
+  print (A)

@@ -1,7 +1,7 @@
 
 default:
-  task(VAR)
+  t(VAR)
 
-task(X):
+t(X):
   $ ls @X
   

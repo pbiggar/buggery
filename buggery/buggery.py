@@ -15,7 +15,8 @@ import re
 
 class Parser(object):
   """Generate a nice AST to use later. We can implement the rule running as an AST walker.
-  Here are the parser productions, ignoring syntactic tokens:
+
+  The concrete grammar ignoring syntactic tokens:
 
     # File
     file := task*
@@ -27,15 +28,17 @@ class Parser(object):
     variable := ID
 
     # Subtask declarations
-    subtask := ID? command|(call*)
-    call := ID argument*
-    argument := string|variable
+    subtask := subtask_list | assignment
+    assignment := ID? (command | call)
+    subtask_list := (command|call)+
+    call := ID expr*
+    command := expr string
 
-    # Final
+    # Strings and interpolation
     string := (string-literal|variable-interpolation)+
     variable-interpolation := ID
 
-  The AST is slightly nicer:
+  The abstract grammar is slightly nicer:
 
     # File
     file := task*
@@ -43,21 +46,19 @@ class Parser(object):
     # Task declarations
     task := taskname:ID parameter* subtask+
     parameter := paramname:ID default-value?
-    default-value := string|variable
+    default-value := string|variable # all expr here?
     variable := varname:ID
 
     # Subtask declarations
-    subtask := lvalue:ID? (COMMAND|call)
-    call := taskname:ID argument*
-    argument := string|variable
-    lvalue := ID
+    subtask := lvalue:ID? expr
+    expr := command | call | string
+    call := taskname:ID expr*
+    command := stdin:expr command:string
 
     # Final
     string := (string-literal|variable-interpolation)+
-    variable-interpolation := ID
+    variable-interpolation := expr
 
-  The AST is implemented as tuples containing the name of the production, followed by the parameters.
-  Lists are wrapped in tuples as in: ('param-list' [('param', ...), ('param', ...)])
 
   """
   ID_syntax = r'[A-Za-z][a-zA-Z0-9_]*'
@@ -208,17 +209,17 @@ class Parser(object):
         p[0] = p[1] + [p[2]]
 
 
-    # TODO: this is awkward - see if you can move the top 3 to the assignment production.
     def p_subtask_line(p):
+      # RHS can be any expression if lvalue provided.
+# 
+      # One of more calls (call-list)
       """
-        subtask_line : INDENT lvalue call
-                     | INDENT lvalue command
-                     | INDENT lvalue STRING
+        subtask_line : INDENT lvalue expr
                      | INDENT call_list
                      | INDENT command
       """
       if len(p) == 3:
-        p[0] = p[2] # same for command or subtask_list
+        p[0] = p[2] # same for command or call_list
 
       else:
         p[0] = Assignment (p[2], p[3])
@@ -230,7 +231,6 @@ class Parser(object):
       command : '$' COMMAND
       """
       # COMMAND may start with a variable in parens, which is hard to split out with the lexer. So do it here.
-      # TODO: I'm starting to need an Expr here: there are tons of places which could do with it, like interpolation, etc.
       command = p[2]
       stdin = None
       if command[0] == '(':
@@ -239,7 +239,7 @@ class Parser(object):
         stdin = m.group(1).strip()
         command = m.group(2).strip()
 
-      p[0] = Command(command, stdin)
+      p[0] = Command(stdin, String(command))
       add_parser_cursor(p)
 
 
@@ -431,7 +431,16 @@ class BuggeryTask(Task):
 
   def _check(self, buggery):
     if len(self.subtasks) == 0:
-      raise UserError ("Task %s has no subtasks" % self.name)
+      raise UserError ("Task %s has no subtasks" % self.name, self)
+
+    # We can statically check all uninitialized variables, since the control flow is linear.
+    initialized_vars = set()
+    for st in self.subtasks:
+      for var in st.uses():
+        if var not in initialized_vars:
+          raise UserError ("Variable %s is used uninitialized" % var, st)
+
+      initialized_vars = initialized_vars.union(st.defs())
 
 
 
@@ -497,6 +506,12 @@ class Command(Subtask):
       raise CommandError(result)
     return result
 
+  def uses(self):
+    return self.command.uses()
+
+  def defs(self):
+    return set()
+
 
 class Call(Subtask):
   def __init__(self, target, args):
@@ -510,12 +525,18 @@ class Call(Subtask):
 
   def _check(self, buggery):
     if self.target not in buggery.tasks:
-      raise UserError("Task %s not defined" % self.target)
+      raise UserError("Task %s not defined" % self.target, self.target)
 
     arg_count = len(self.args)
     param_count = buggery.tasks[self.target].param_count()
     if arg_count > param_count:
       raise UserError("Task %s called with %s arguments, though there are %s parameters" % (self.target, arg_count, param_count), self)
+
+  def uses(self):
+    return set([var.name for var in self.args if isinstance(var, Variable)])
+
+  def defs(self):
+    return set()
 
 
 class StaticString(Subtask):
@@ -541,6 +562,10 @@ class Param(Node):
     self.name = name
     self.default = default
 
+class RespondFalse(object):
+
+  def __getattr__(*args, **kwargs):
+    return False
 
 class Buggery(Node):
   def __init__(self, task_list):
@@ -550,7 +575,7 @@ class Buggery(Node):
     self.globals = self.StackFrame()
     self.add_builtins()
 
-    self.options = object()
+    self.options = RespondFalse()
 
 
   def add_tasks(self, task_list):
@@ -560,15 +585,15 @@ class Buggery(Node):
 
   def add_task(self, task):
     if task.name in self.tasks:
-      raise UserError("Duplicate task: %s" % task.name)
+      raise UserError("Duplicate task: %s" % task.name, task)
 
     self.tasks[task.name] = task
 
   def check(self):
     self.traverse("_check", self)
 
-    if len(self.tasks) == 0:
-      raise UserError("No tasks defined")
+    if len(self.tasks) == self.num_builtins:
+      raise UserError("No tasks defined", None)
 
   class StackFrame(dict):
     pass
@@ -631,6 +656,9 @@ class Buggery(Node):
     def builtin_print (string):
       print string
 
+    def builtin_pass ():
+      pass
+
     def builtin_save(filename, string):
       import os.path
       file(os.path.expanduser(filename), 'w').write(string)
@@ -642,6 +670,8 @@ class Buggery(Node):
     self.add_task (PythonTask("print", builtin_print))
     self.add_task (PythonTask("save", builtin_save))
     self.add_task (PythonTask("append", builtin_append))
+    self.add_task (PythonTask("pass", builtin_pass))
+    self.num_builtins = 4
 
 
 

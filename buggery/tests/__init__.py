@@ -1,8 +1,8 @@
 # Dynamically add tests for all files in the tests/errors/ directory. A test
 # called 'a' would be added as "test_a", which means nose would pick it up.
 
-def insert_error_tests():
-  """Create a nosetest for each file in the error directory, and assert that it raises a UserError."""
+def insert_file_tests():
+  """Create a nosetest for each file in each sub-directory."""
 
   from nose.tools import raises
   import glob
@@ -11,24 +11,34 @@ def insert_error_tests():
   from buggery.exceptions import UserError
   from buggery import Parser
 
-  for filename in glob.glob(__path__[0] + "/errors/*.bgr"):
-    name = "test_" + os.path.basename(filename)
-    contents = file(filename).read()
+  # If we directly create the inner functions, they'll all bind to the same
+  # variable `contents`, which is not what we want.
+  def gen_error_func(name, contents):
+    @raises(UserError)
+    def func():
+      Parser().parse(contents)
 
-    # A function to generate the test functions we need. If we directly create
-    # the functions, they'll all bind to the same variable `contents`, which
-    # is not what we want.
-    def gen_func(param):
-      @raises(UserError)
-      def func():
-        Parser().parse(param)
+    func.__name__ = name
+    return func
 
-      func.__name__ = name
-      return func
+  def gen_normal_func(name, contents):
+    def func():
+      Parser().parse(contents)
 
-    globals()[name] = gen_func(contents)
+    func.__name__ = name
+    return func
 
-insert_error_tests()
+  def read_files(dir, func):
+    for filename in glob.glob(__path__[0] + '/' + dir + "/*.bgr"):
+      name = "test_" + os.path.basename(filename)
+      contents = file(filename).read()
+      globals()[name] = func(name, contents)
+
+  read_files("errors", gen_error_func)
+  read_files("parsing", gen_normal_func)
+
+
+insert_file_tests()
 
 # Don't export symbols we don't intent to.
-del insert_error_tests
+del insert_file_tests
