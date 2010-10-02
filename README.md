@@ -19,7 +19,7 @@ Python, but bash is easier to get started with...
 Buggery is a domain specific language for command-line scripts, designed to
 replace shell scripting. It is designed for simplicity and maintainability,
 which are the real problems with shell scripts. It aims at the niche where
-Python, Bash and Make are nearly but not quite the right tools. 
+Python, bash and make are nearly but not quite the right tools. 
 
 Here is a simple buggery script, saved in `~/bin/go`:
 
@@ -29,13 +29,13 @@ Here is a simple buggery script, saved in `~/bin/go`:
       compile, test, bench
 
     compile:
-      $ cd build/ && make
+      $ make -C build/
 
     test:
-      $ python ./unit-test --all
+      $ python tests/unit-test --all
 
     bench:
-      $ cd build/ && make benchmark
+      $ make -C build/ benchmark
       $ build/benchmark --compare-to build/baseline-test-results.txt
 
 At the command line, use it by running:
