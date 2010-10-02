@@ -1,4 +1,3 @@
-==============================
 Tiny introduction
 ==============================
 
@@ -7,15 +6,13 @@ replace shell scripting. It is designed for simplicity and maintainability,
 which are the real problems with shell scripts. It aims at the niche where
 Python, Bash and Make are nearly but not quite the right tools. 
 
-==============================
 More resources
 ==============================
 
-introduction.md:  a longer introduction, including a code sample.
-tutorial.md:      a five minute lesson with everything you need to know
-faq.md:           Questions and answers.
+  - introduction.md:  a longer introduction, including a code sample.
+  - tutorial.md:      a five minute lesson with everything you need to know
+  - faq.md:           Questions and answers.
 
-==============================
 Contact
 ==============================
 
