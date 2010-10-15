@@ -11,6 +11,7 @@ import subprocess
 import shlex
 import inspect
 import re
+import pdb
 
 
 class Parser(object):
@@ -61,10 +62,10 @@ class Parser(object):
 
 
   """
-  ID_syntax = r'[A-Za-z][a-zA-Z0-9_]*'
-  var_syntax = r'[A-Z][A-Z0-9_]*'
-  subtask_syntax = r'[a-z][a-z0-9_]*'
-  task_syntax = r'[A-Za-z][a-z_]*'
+  ID_syntax = r'[A-Za-z][a-zA-Z0-9-_]*'
+  var_syntax = r'[A-Z][A-Z0-9-_]*'
+  subtask_syntax = r'[a-z][a-z0-9-_]*'
+  task_syntax = r'[A-Za-z][a-z-_]*'
 
 
   def parse(self, input):
@@ -101,7 +102,7 @@ class Parser(object):
       val = t.value[1:-1]
       val = re.sub(r'\\n', "\n", val);
       val = re.sub(r'\\t', "\t", val);
-      t.value = StaticString(val)
+      t.value = StringData(BStr(val))
       add_token_cursor(t)
       return t
 
@@ -211,7 +212,6 @@ class Parser(object):
 
     def p_subtask_line(p):
       # RHS can be any expression if lvalue provided.
-# 
       # One of more calls (call-list)
       """
         subtask_line : INDENT lvalue expr
@@ -224,6 +224,15 @@ class Parser(object):
       else:
         p[0] = Assignment (p[2], p[3])
         add_parser_cursor(p)
+
+    def p_expr(p):
+      """
+        expr : command
+             | call
+             | STRING
+      """
+      p[0] = p[1]
+      add_parser_cursor(p)
 
 
     def p_command(p):
@@ -239,7 +248,7 @@ class Parser(object):
         stdin = m.group(1).strip()
         command = m.group(2).strip()
 
-      p[0] = Command(stdin, String(command))
+      p[0] = Command(BStr(command), stdin)
       add_parser_cursor(p)
 
 
@@ -406,7 +415,7 @@ class BuggeryTask(Task):
     # Copy the parameters into the stack frame
     for p in self.params:
       try:
-        actual = actuals.pop(0)
+        actual = actuals.pop(0).eval(buggery)
       except IndexError:
         if p.default:
           actual = p.default.eval(buggery)
@@ -428,19 +437,37 @@ class BuggeryTask(Task):
     except:
       pass
 
+  # The startup task has defs which become global variables, so we need to define this
+  def defs(self):
+    l = []
+    x = [st.defs() for st in self.subtasks]
+    map(l.extend, x)
+    return l
+
+
 
   def _check(self, buggery):
     if len(self.subtasks) == 0:
       raise UserError ("Task %s has no subtasks" % self.name, self)
 
     # We can statically check all uninitialized variables, since the control flow is linear.
-    initialized_vars = set()
+    inited_vars = set()
+
+    # Add the parameters
+    inited_vars = inited_vars.union([p.name for p in self.params])
+
+    # Add the globals
+    if self.name != 'startup':
+      inited_vars = inited_vars.union(buggery.get_global_variable_names())
+
+    # Check
     for st in self.subtasks:
       for var in st.uses():
-        if var not in initialized_vars:
+        if var not in inited_vars:
           raise UserError ("Variable %s is used uninitialized" % var, st)
 
-      initialized_vars = initialized_vars.union(st.defs())
+      # Add defined variables
+      inited_vars = inited_vars.union(st.defs())
 
 
 
@@ -456,19 +483,25 @@ class PythonTask(Task):
   def param_count(self):
     return self.function.func_code.co_argcount
 
-
-
-# eval always returns a Data object
+  def defs(self):
+    return []
 
 
 class Assignment(Subtask):
   def __init__(self, lvalue, rvalue):
+    assert (not isinstance (rvalue, str))
     self.lvalue = lvalue
     self.rvalue = rvalue
 
   def eval(self, buggery):
     result = self.rvalue.eval(buggery)
     buggery.set_var(self.lvalue, result)
+
+  def uses(self):
+    return self.rvalue.uses()
+
+  def defs(self):
+    return [self.lvalue]
 
 
 class Command(Subtask):
@@ -477,7 +510,7 @@ class Command(Subtask):
     self.stdin_var = stdin_var
 
   def eval(self, buggery):
-    command = buggery.interpolate (self.command, self)
+    command = self.command.interpolate(buggery, self)
 
     if buggery.options.verbose:
       print "    $ " + command
@@ -539,15 +572,6 @@ class Call(Subtask):
     return set()
 
 
-class StaticString(Subtask):
-  def __init__(self, string):
-    self.string = string
-
-  def eval(self, buggery):
-    return StringData(buggery.interpolate(self.string))
-
-
-
 class Variable(Node):
   def __init__(self, name):
     self.name = name
@@ -562,10 +586,6 @@ class Param(Node):
     self.name = name
     self.default = default
 
-class RespondFalse(object):
-
-  def __getattr__(*args, **kwargs):
-    return False
 
 class Buggery(Node):
   def __init__(self, task_list):
@@ -574,6 +594,10 @@ class Buggery(Node):
     self.stack = []
     self.globals = self.StackFrame()
     self.add_builtins()
+
+    class RespondFalse(object):
+      def __getattr__(*args, **kwargs):
+        return False
 
     self.options = RespondFalse()
 
@@ -633,15 +657,14 @@ class Buggery(Node):
 
   # There's no need for checking here, since all variable and global names are statically known, and can be statically checked.
   def set_var(self, name, value):
+    assert (isinstance (value, Data))
     self.stack[0][name] = value
 
-  def interpolate(self, string, stateobj=None):
-    # TODO handle complex interpolation ("@{...}")
+  def get_global_variable_names(self):
+    if 'startup' in self.tasks:
+      return self.tasks['startup'].defs()
 
-    # For string interpolation, using the @ symbol. A regex is sufficient for this.
-    return re.sub(r'@' + Parser.var_syntax + '',
-                  lambda m: self.get_var(m.group(0)[1:], stateobj).as_string(),
-                  string)
+    return []
 
 
   def help_string(self):
@@ -673,6 +696,24 @@ class Buggery(Node):
     self.add_task (PythonTask("pass", builtin_pass))
     self.num_builtins = 4
 
+  def has_task(self, name):
+    return name in self.tasks
+
+
+
+class BStr(str):
+  """Buggery string, the base for all strings, is interpolable"""
+
+  def interpolate(self, buggery, stateobj=None):
+    # TODO handle complex interpolation ("@{...}")
+
+    # For string interpolation, using the @ symbol. A regex is sufficient for this.
+    return re.sub(r'@' + Parser.var_syntax + '',
+                  lambda m: buggery.get_var(m.group(0)[1:], stateobj).as_string(),
+                  self)
+
+  def uses(self):
+    return re.findall (r'@(' + Parser.var_syntax + ')', self)
 
 
 
@@ -699,12 +740,14 @@ class ProcData(Data):
 
 class StringData(Data):
   def __init__(self, string):
-    assert (isinstance(string, str))
+    assert (isinstance(string, BStr))
     self.string = string
 
   def eval(self, buggery):
-    """Get actual value. This performs interpolation."""
-    return buggery.interpolate(self.string)
+    return StringData(BStr(self.string.interpolate(buggery)))
+
+  def uses(self):
+    return self.string.uses()
 
   def as_string (self):
     return self.string

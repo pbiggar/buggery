@@ -1,6 +1,6 @@
 class UserError(Exception):
-  def __init__(self, message, parseobj):
-    self.message = message
+  def __init__(self, msg, parseobj):
+    self.msg = msg
     self.parseobj = parseobj
 
   def line_number(self):

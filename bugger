@@ -7,11 +7,11 @@ import os
 import glob
 import re
 from optparse import OptionParser # use optparse rather than argparse since it's portable between versions, not just 2.7 and beyond.
-from buggery.exceptions import CommandError, UserError
-import buggery
 
 
 try:
+  from buggery.exceptions import CommandError, UserError
+  import buggery
   from buggery import Parser
 except ImportError, e:
   if str(e) == 'No module named ply.lex' or str(e) == 'No module named ply.yacc':
@@ -23,6 +23,7 @@ except ImportError, e:
 
   Otherwise, download and install from http://www.dabeaz.com/ply/
 """)
+
   raise e
 
 
@@ -43,7 +44,7 @@ def main():
   (options, args) = parse_command_line()
   filename = args[1] if len(args) > 1 else None
   command  = args[2] if len(args) > 2 else None
-  args = [buggery.buggery.StringData(arg) for arg in args[3:]]
+  args = [buggery.buggery.StringData(buggery.buggery.BStr(arg)) for arg in args[3:]]
 
   # Parse the buggery file
   if filename == None:
@@ -69,9 +70,15 @@ def main():
     sys.exit(0)
 
   def run_task(name, args):
-    result = bugger.run(name, args)
-    if result != None:
-      print result.as_string()
+    if bugger.has_task(name):
+      result = bugger.run(name, args)
+      if result != None:
+        print result.as_string()
+
+  if os.path.exists("bugger-stdout.txt"):
+    os.remove("bugger-stdout.txt")
+  if os.path.exists("bugger-stderr.txt"):
+    os.remove("bugger-stderr.txt")
 
   run_task("startup", [])
   run_task(command, args)
@@ -118,5 +125,5 @@ if __name__ == "__main__":
   pid:       %s
 """ % (e.proc.command, stdin, stdout, stderr, e.proc.exit_code, e.proc.pid)
   except UserError, e:
-    print ("%s:%s: %s" % (e.line_number(), e.column_number(), e.message))
+    print ("%s:%s: %s" % (e.line_number(), e.column_number(), e.msg))
     raise # Don't catch UserErrors yet
