@@ -1,18 +1,23 @@
-#!./bugger
+#!/usr/bin/env bugger
 
 ##############################
-# Startup is always called
+# startup is always called
 ##############################
-Startup:
+startup:
+# TODO: assert we're in the right directory
   PWD=$ pwd
-  BRANCH=$ hg qtop
-  BUILDDIR="@PWD/build_$BRANCH\_OPT.OBJ"
+  BRANCH=$ hg qtop | sed 's/no patches applied/baseline/'
+  BUILDDIR="@PWD/build_@BRANCH\_OPT.OBJ"
   BASELINEDIR="@PWD/build_baseline_OPT.OBJ"
   MAKE="make -j3"
 
 ##############################
 # Task lists
 ##############################
+
+Check:
+  compile, trace-test, ref-test
+
 Quick:
   compile, trace-test, sunspider, ubench
 
@@ -34,10 +39,16 @@ Baseline: # run the benchmarks after popping all the directories
 # Building
 ##############################
 compile(DIR=BUILDDIR):
-  $ cd @DIR && @MAKE
+  possibly_configure
+  $ @MAKE -C @DIR
+
+possibly_configure(DIR=BUILDDIR):
+  $ test -e @DIR || mkdir -p @DIR
+  $ test -e @DIR/Makefile || (cd @DIR && ../configure)
+
 
 build-ff:
-  $ cd ../../ && @MAKE -f client.mk build
+  $ @MAKE -f client.mk build -C ../../
 
 
 ##############################
@@ -45,10 +56,10 @@ build-ff:
 ##############################
 
 trace-test(DIR=BUILDDIR):
-  $ python trace-test/trace-test.py $DIR/js
+  $ python trace-test/trace_test.py @DIR/js
 
 ref-test(DIR=BUILDDIR):
-  $ cd @DIR && python ../tests/jstests.py ./js --args="-j"
+  $ python tests/jstests.py @DIR/js --args="-j"
 
 
 ##############################
