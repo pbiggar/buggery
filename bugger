@@ -69,20 +69,23 @@ def main():
     print bugger.help_string()
     sys.exit(0)
 
-  def run_task(name, args):
-    if bugger.has_task(name):
-      result = bugger.run(name, args)
-      if result != None:
-        print result.as_string()
+  def run_task(name, fail_if_missing, args):
+    if not bugger.has_task(name) and not fail_if_missing:
+      return
+
+    result = bugger.run(name, args)
+    if result != None:
+      print result.as_string()
+
 
   if os.path.exists("bugger-stdout.txt"):
     os.remove("bugger-stdout.txt")
   if os.path.exists("bugger-stderr.txt"):
     os.remove("bugger-stderr.txt")
 
-  run_task("startup", [])
-  run_task(command, args)
-  run_task("shutdown", [])
+  run_task("startup", False, [])
+  run_task(command, True, args)
+  run_task("shutdown", False, [])
 
 if __name__ == "__main__":
   e = None
@@ -114,16 +117,18 @@ if __name__ == "__main__":
 
     stdin  = shorten("stdin", e.proc.stdin)
     stdout = shorten("stdout", e.proc.stdout)
-    stderr = shorten("stderr", e.proc.stderr)
+    stderr = e.proc.stderr
+    shorten("stderr", e.proc.stderr) # to save it
+
 
     print """A command has failed:
   command:   %s
   stdin:     %s
   stdout:    %s
-  stderr:    %s
   exit code: %s
   pid:       %s
-""" % (e.proc.command, stdin, stdout, stderr, e.proc.exit_code, e.proc.pid)
+  stderr:\n%s
+""" % (e.proc.command, stdin, stdout, e.proc.exit_code, e.proc.pid, stderr)
   except UserError, e:
     print ("%s:%s: %s" % (e.line_number(), e.column_number(), e.msg))
     raise # Don't catch UserErrors yet
