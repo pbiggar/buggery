@@ -99,12 +99,17 @@ class Parser(object):
 
     def t_STRING(t):
       r'"(\\.|[^\\"])*"'
-      val = t.value[1:-1]
-      val = re.sub(r'\\n', "\n", val);
-      val = re.sub(r'\\t', "\t", val);
-      t.value = StringData(BStr(val))
+      t.value = t.value[1:-1]
+      t.value = transform_escapes(t.value)
+      t.value = StringData(BStr(t.value))
       add_token_cursor(t)
       return t
+
+    def transform_escapes (val):
+      val = re.sub(r'\\r', "\r", val);
+      val = re.sub(r'\\n', "\n", val);
+      val = re.sub(r'\\t', "\t", val);
+      return val
 
     # Put this before TASKNAME
     def t_COMMAND(t):
