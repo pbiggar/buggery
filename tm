@@ -137,8 +137,8 @@ newbug(BUGNUM):
   $ hg --cwd @DIR qimport bz://@BUGNUM
 
 newclone(DIR):
-  $ hg clone jitmonkey-clean @DIR
-  $ echo "default-push = ssh://hg.mozilla.org/jitmonkey" >> @DIR/.hg/hgrc
+  $ hg clone tracemonkey-clean @DIR
+  $ echo "default-push = ssh://hg.mozilla.org/tracemonkey" >> @DIR/.hg/hgrc
   $ hg --cwd @DIR qinit -c 
   $ hg --cwd @DIR qimport -p ../sunspider.patch
   $ hg --cwd @DIR qimport -p ../single_apply.patch
