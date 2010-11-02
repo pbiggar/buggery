@@ -13,6 +13,13 @@ import inspect
 import re
 import pdb
 
+def bgrassert (cond):
+  if not cond:
+    print("Assertion failed: Condition is not true: " + str(cond))
+    import pdb
+    pdb.set_trace()
+
+
 
 class Parser(object):
   """Generate a nice AST to use later. We can implement the rule running as an AST walker.
@@ -449,11 +456,30 @@ class BuggeryTask(Task):
     map(l.extend, x)
     return l
 
+  def returns_value (self):
+    return "RETVAL" in self.defs()
+
 
 
   def _check(self, buggery):
     if len(self.subtasks) == 0:
       raise UserError ("Task %s has no subtasks" % self.name, self)
+
+    self.check_initialized_variables(buggery)
+    self.check_return_values(buggery)
+
+  def check_return_values(self, buggery):
+    for st in self.subtasks:
+      if isinstance(st, Assignment):
+        if isinstance (st.rvalue, Call):
+          name = st.rvalue.target
+          if not buggery.get_task (name).returns_value():
+            raise UserError ("Task %s does not return a value" % name, st.rvalue)
+
+
+
+
+  def check_initialized_variables(self, buggery):
 
     # We can statically check all uninitialized variables, since the control flow is linear.
     inited_vars = set()
@@ -526,8 +552,27 @@ class Command(Subtask):
       stdin_proc = subprocess.PIPE
 
     try:
-      proc = subprocess.Popen(command, stdin=stdin_proc, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-      (stdout, stderr) = proc.communicate(stdin_str)
+      proc = subprocess.Popen(command, stdin=stdin_proc, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, bufsize=0)
+
+      stdout = ""
+      stderr = ""
+
+      if stdin_str:
+        proc.stdin.write(stdin_str)
+
+      # Read directly so that we can save it and output it
+      while proc.poll() is None:
+        out = proc.stdout.read()
+        err = proc.stderr.read()
+
+        stdout += out
+        stderr += err
+
+        sys.stdout.write(out)
+        sys.stdout.flush()
+        sys.stderr.write(err)
+        sys.stderr.flush()
+
     except KeyboardInterrupt, e:
       # It'll do a CommandError I hope.
       stdout = proc.stdout.read()
@@ -618,6 +663,9 @@ class Buggery(Node):
 
     self.tasks[task.name] = task
 
+  def get_task(self, name):
+    return self.tasks[name]
+
   def check(self):
     self.traverse("_check", self)
 
@@ -662,7 +710,7 @@ class Buggery(Node):
 
   # There's no need for checking here, since all variable and global names are statically known, and can be statically checked.
   def set_var(self, name, value):
-    assert (isinstance (value, Data))
+    bgrassert (isinstance (value, Data))
     self.stack[0][name] = value
 
   def get_global_variable_names(self):
