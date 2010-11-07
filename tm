@@ -81,7 +81,7 @@ Tags:
 # Tests
 ##############################
 compile_debug:
-  compile (OBJDIR_DBG, "--enable-debug --disable-optimize")
+  RETVAL=compile (OBJDIR_DBG, "--enable-debug --disable-optimize")
 
 test:
   jit-test
