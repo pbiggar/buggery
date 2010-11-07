@@ -74,7 +74,7 @@ Build-firefox:
   $ @MAKE -f client.mk build -C ../../
 
 Tags:
-  $ ctags -R --languages=c,c++ .
+  $ ctags -R --languages=c,c++ --exclude='build_*' .
 
 
 ##############################
