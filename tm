@@ -62,7 +62,7 @@ Baseline: # run the benchmarks after popping all the directories
 ##############################
 compile(DIR=OBJDIR_OPT, CONFIGURE_FLAGS="--enable-optimize --disable-debug"):
   possibly_configure (DIR, CONFIGURE_FLAGS)
-  $ @MAKE -C @DIR
+  RETVAL=$ @MAKE -C @DIR
 
 possibly_configure(DIR, CONFIGURE_FLAGS):
   $ test -e configure || autoconf213
