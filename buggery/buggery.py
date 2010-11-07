@@ -417,7 +417,7 @@ class BuggeryTask(Task):
     return len(self.params)
 
 
-  def run(self, buggery, actuals):
+  def run(self, buggery, actuals, caller):
 
     if buggery.options.verbose:
       str_actuals = [a.as_string() for a in actuals]
@@ -432,7 +432,7 @@ class BuggeryTask(Task):
         if p.default:
           actual = p.default.eval(buggery)
         else:
-          raise UserError("Less parameters than expected")
+          raise UserError("Less parameters than expected", caller or self)
 
       if actual == None:
         raise UserError("Null is not a valid value")
@@ -507,7 +507,7 @@ class PythonTask(Task):
     super(PythonTask, self).__init__(name)
     self.function = function
 
-  def run(self, buggery, actuals):
+  def run(self, buggery, actuals, caller):
     vals = [actual.as_string() for actual in actuals]
     return self.function(*vals)
 
@@ -613,7 +613,7 @@ class Call(Subtask):
 
   def eval(self, buggery):
     actuals = [arg.eval(buggery) for arg in self.args]
-    return buggery.run(self.target, actuals)
+    return buggery.run(self.target, actuals, self)
 
 
   def _check(self, buggery):
@@ -686,10 +686,7 @@ class Buggery(Node):
     pass
 
 
-  def run(self, taskname, args, use_globals = False):
-
-    if taskname == "startup":
-      use_globals = True
+  def run(self, taskname, args, caller=None):
 
     if taskname not in self.tasks:
       raise UserError ("No task '%s' defined" % taskname, None)
@@ -697,11 +694,12 @@ class Buggery(Node):
     task = self.tasks[taskname]
 
     # New stackframe and copy parameters
+    use_globals = (taskname == "startup")
     frame = self.StackFrame() if not use_globals else self.globals
     self.stack.insert(0, frame)
 
     # Run the task itself
-    result = task.run(self, args)
+    result = task.run(self, args, caller)
 
     # Pop the stackframe
     self.stack.pop(0)
