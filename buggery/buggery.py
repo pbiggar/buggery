@@ -551,33 +551,43 @@ class Command(Subtask):
       stdin_str = buggery.get_var(self.stdin_var).as_string()
       stdin_proc = subprocess.PIPE
 
+
+    outs = ["", ""]
+
+    def add_output(_out, _err):
+      outs[0] += _out
+      outs[1] += _err
+
+      sys.stdout.flush()
+      sys.stderr.flush()
+
+      if buggery.options.verbose:
+        sys.stdout.write(_out)
+        sys.stdout.flush()
+        sys.stderr.write(_err)
+        sys.stderr.flush()
+
+
     try:
       proc = subprocess.Popen(command, stdin=stdin_proc, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, bufsize=0)
-
-      stdout = ""
-      stderr = ""
 
       if stdin_str:
         proc.stdin.write(stdin_str)
 
       # Read directly so that we can save it and output it
+      # TODO: make this work with stderr too, possibly by using pexpect (where available)
       while proc.poll() is None:
-        out = proc.stdout.read()
-        err = proc.stderr.read()
+        out = proc.stdout.read(1)
+        err = ''
+        add_output(out, err)
 
-        stdout += out
-        stderr += err
-
-        sys.stdout.write(out)
-        sys.stdout.flush()
-        sys.stderr.write(err)
-        sys.stderr.flush()
+      # Flush the remaining data
+      add_output(proc.stdout.read(), proc.stderr.read())
 
     except KeyboardInterrupt, e:
-      # It'll do a CommandError I hope.
-      stdout = proc.stdout.read()
-      stderr = proc.stderr.read()
+      add_output(proc.stdout.read(), proc.stderr.read())
 
+    stdout, stderr = outs[0], outs[1]
     result = ProcData(command=command,
                       stdin=stdin_str,
                       stdout=stdout.strip(),
