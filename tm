@@ -143,3 +143,8 @@ newclone(DIR):
   $ hg --cwd @DIR qimport -p ../sunspider.patch
   $ hg --cwd @DIR qimport -p ../single_apply.patch
   $ hg --cwd @DIR qnew baseline
+
+fetch:
+  PARENT=$ hg showconfig | grep paths\.default= | sed 's/paths.default=//'
+  $ hg fetch --cwd @PARENT
+  $ hg fetch
