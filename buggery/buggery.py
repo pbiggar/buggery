@@ -618,12 +618,12 @@ class Call(Subtask):
 
   def _check(self, buggery):
     if self.target not in buggery.tasks:
-      raise UserError("Task %s not defined" % self.target, self.target)
+      raise UserError("Task '%s' not defined" % self.target, self.target)
 
     arg_count = len(self.args)
     param_count = buggery.tasks[self.target].param_count()
     if arg_count > param_count:
-      raise UserError("Task %s called with %s arguments, though there are %s parameters" % (self.target, arg_count, param_count), self)
+      raise UserError("Task '%s' called with %s arguments, though there are only %s parameters" % (self.target, arg_count, param_count), self)
 
   def uses(self):
     return set([var.name for var in self.args if isinstance(var, Variable)])
