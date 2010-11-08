@@ -416,6 +416,8 @@ class BuggeryTask(Task):
   def param_count(self):
     return len(self.params)
 
+  def required_param_count(self):
+    return len([p for p in self.params if not p.default])
 
   def run(self, buggery, actuals, caller):
 
@@ -512,7 +514,16 @@ class PythonTask(Task):
     return self.function(*vals)
 
   def param_count(self):
-    return self.function.func_code.co_argcount
+    (args, varargs, varkw, defaults) = inspect.getargspec(self.function)
+    return len(args)
+
+  def required_param_count(self):
+    (args, varargs, varkw, defaults) = inspect.getargspec(self.function)
+    count = len(args)
+    if defaults: # this can be None
+      count -= len(defaults)
+
+    return count
 
   def defs(self):
     return []
@@ -624,6 +635,10 @@ class Call(Subtask):
     param_count = buggery.tasks[self.target].param_count()
     if arg_count > param_count:
       raise UserError("Task '%s' called with %s arguments, though there are only %s parameters" % (self.target, arg_count, param_count), self)
+
+    required_param_count = buggery.tasks[self.target].required_param_count()
+    if arg_count < required_param_count:
+      raise UserError("Task '%s' called with %s arguments, but %s parameters are required" % (self.target, arg_count, required_param_count), self)
 
   def uses(self):
     return set([var.name for var in self.args if isinstance(var, Variable)])
