@@ -1,1 +1,1 @@
-alias t="nosetests --all-modules"
+alias t="nosetests --all-modules --with-coverage --cover-package=buggery,lcdict"
