@@ -641,7 +641,8 @@ class Call(Subtask):
       raise UserError("Task '%s' called with %s arguments, but %s parameters are required" % (self.target, arg_count, required_param_count), self)
 
   def uses(self):
-    return set([var.name for var in self.args if isinstance(var, Variable)])
+    list = sum ([arg.uses() for arg in self.args], [])
+    return [x for x in set(list)]
 
   def defs(self):
     return set()
@@ -653,6 +654,9 @@ class Variable(Node):
 
   def eval(self, buggery):
     return buggery.get_var(self.name, self)
+
+  def uses(self):
+    return [self.name]
 
 
 
