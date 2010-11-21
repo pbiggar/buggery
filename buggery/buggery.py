@@ -559,7 +559,7 @@ class Command(Subtask):
 
     stdin_str, stdin_proc = None, None
     if self.stdin_var:
-      stdin_str = buggery.get_var(self.stdin_var).as_string()
+      stdin_str = buggery.get_var(self.stdin_var, self).as_string()
       stdin_proc = subprocess.PIPE
 
 
