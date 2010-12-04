@@ -12,6 +12,7 @@ import shlex
 import inspect
 import re
 import pdb
+import threading
 
 def bgrassert (cond):
   if not cond:
@@ -531,7 +532,7 @@ class PythonTask(Task):
 
 class Assignment(Subtask):
   def __init__(self, lvalue, rvalue):
-    assert (not isinstance (rvalue, str))
+    bgrassert (not isinstance (rvalue, str))
     self.lvalue = lvalue
     self.rvalue = rvalue
 
@@ -565,40 +566,47 @@ class Command(Subtask):
 
     outs = ["", ""]
 
-    def add_output(_out, _err):
-      outs[0] += _out
-      outs[1] += _err
+    class ThreadWorker(threading.Thread):
+      def __init__(self, pipe, debug_target):
+        super(ThreadWorker, self).__init__()
+        self.all = ""
+        self.pipe = pipe
+        self.debug_target = debug_target
+        self.setDaemon(True)
 
-      sys.stdout.flush()
-      sys.stderr.flush()
+      def run(self):
+        while True:
+          line = self.pipe.readline()
+          if line == '': break
+          else:
+            self.all += line
 
-      if buggery.options.verbose:
-        sys.stdout.write(_out)
-        sys.stdout.flush()
-        sys.stderr.write(_err)
-        sys.stderr.flush()
+            if buggery.options.verbose:
+              self.debug_target.write(line)
+              self.debug_target.flush()
 
 
     try:
-      proc = subprocess.Popen(command, stdin=stdin_proc, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, bufsize=0)
+      proc = subprocess.Popen(command, stdin=stdin_proc, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
 
       if stdin_str:
         proc.stdin.write(stdin_str)
 
+      stdout_worker = ThreadWorker(proc.stdout, sys.stdout)
+      stderr_worker = ThreadWorker(proc.stderr, sys.stderr)
+      stdout_worker.start()
+      stderr_worker.start()
+
+
       # Read directly so that we can save it and output it
       # TODO: make this work with stderr too, possibly by using pexpect (where available)
       while proc.poll() is None:
-        out = proc.stdout.read(1)
-        err = ''
-        add_output(out, err)
-
-      # Flush the remaining data
-      add_output(proc.stdout.read(), proc.stderr.read())
+        pass
 
     except KeyboardInterrupt, e:
-      add_output(proc.stdout.read(), proc.stderr.read())
+      pass
 
-    stdout, stderr = outs[0], outs[1]
+    stdout, stderr = stdout_worker.all, stderr_worker.all
     result = ProcData(command=command,
                       stdin=stdin_str,
                       stdout=stdout.strip(),
