@@ -828,7 +828,7 @@ class ProcData(Data):
 
 class StringData(Data):
   def __init__(self, string):
-    assert (isinstance(string, BStr))
+    bgrassert (isinstance(string, BStr))
     self.string = string
 
   def eval(self, buggery):
