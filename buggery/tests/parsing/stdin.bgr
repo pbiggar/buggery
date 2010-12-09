@@ -1,0 +1,3 @@
+x:
+  Y = "asd"
+  $(Y) echo
