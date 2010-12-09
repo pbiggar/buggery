@@ -1,5 +1,10 @@
+# TEST-output: ab
+
 t1:
   pass, pass
+
+test:
+  t2("a", "b")
 
 
 t2(A,B):
@@ -7,5 +12,5 @@ t2(A,B):
   t3(B)
 
 t3(A):
-  $ echo ""
+  $ echo @A
 

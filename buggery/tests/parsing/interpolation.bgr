@@ -1,5 +1,6 @@
+# TEST-output: asd zxc
 
-t1:
+test:
   t2("asd", "zxc")
 
 t2(A1,B2):

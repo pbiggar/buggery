@@ -834,18 +834,3 @@ class StringData(Data):
 
   def as_string (self):
     return self.string
-
-
-
-#raise Exception("No top-level task named: " + name)
-# TODO: lots of test cases which don't raise, and which can be successfully parsed
-def simple_buggery():
-  return Parser().parse("mytask:\n  $ ls")
-
-@raises(UserError)
-def test_undefined_task():
-  simple_buggery().run("undef_task", [])
-
-def test_simple():
-  simple_buggery().run("mytask", [])
-

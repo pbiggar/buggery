@@ -8,29 +8,45 @@ def insert_file_tests():
   import glob
   import pdb
   import os.path
+  import re
   from buggery.exceptions import UserError
   from buggery import Parser
+
+  def parse_test_comments(lines):
+    result = {'output': '', 'args': '', 'task': 'test'}
+    for line in lines:
+      matches = re.match ('^\s*#\s*TEST-(\w+): (.*)$', lines)
+      if matches != None:
+        result[matches.groups()[1]] = matches.groups()[2]
+
+    result['args'] = result['args'].split(' ')
+
+    return result
+
+
 
   # If we directly create the inner functions, they'll all bind to the same
   # variable `contents`, which is not what we want.
   def gen_error_func(name, contents):
     @raises(UserError)
     def func():
-      Parser().parse(contents)
+      test_comments = parse_test_comments(contents)
+      bugger = Parser().parse(contents)
+      output = bugger.run(test_comments['task'], test_comments['args'])
 
     func.__name__ = name
     return func
 
   def gen_normal_func(name, contents):
     def func():
-      Parser().parse(contents)
+      bugger = Parser().parse(contents)
 
     func.__name__ = name
     return func
 
   def read_files(dir, func):
     for filename in glob.glob(__path__[0] + '/' + dir + "/*.bgr"):
-      name = "test_" + os.path.basename(filename)
+      name = "test_" + dir + '_' + os.path.basename(filename)
       contents = file(filename).read()
       globals()[name] = func(name, contents)
 

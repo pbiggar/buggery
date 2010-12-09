@@ -1,3 +1,5 @@
-x:
+# TEST-output: asd
+
+test:
   Y = "asd"
   $(Y) echo

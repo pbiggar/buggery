@@ -1,2 +1,5 @@
-a1:
-  X = $ ls
+# TEST-output: A
+
+test:
+  X = $ echo "A"
+  print (X)
