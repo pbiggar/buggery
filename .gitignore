@@ -1,2 +1,4 @@
 *.pyc
 parsetab.py
+.coverage
+nosetests.xml
