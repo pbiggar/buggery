@@ -50,31 +50,6 @@ Quick:
 Full:
   compile, jit-test, ref-test, sunspider, v8, ubench, build-firefox, dump-patch
 
-# TODO:
-#   if it starts with a capital letter, display it
-#   if its a command with $$, display it
-#   "display it" means show the command, then show the output. But also capture it.
-#   add 'exists(..) or/and/not' type syntax for predicates
-#   allow comments in many more places
-#   multiple levels of indentation means continue the command or line
-#     eg:
-#       command:
-#         $ asdasd
-#           --some-flag
-#           --another-flag
-#   capture all flags, and apply them
-#     check they can be applied before running any commands
-#     all paths
-#   allow all python functions to be called by prefixing them with 'py'
-#     pyos.paths
-#
-#   rename RETVAL to RESULT, ala Eiffel
-#
-#   -v should go in, then out, maybe using indentation and '>' and '<'
-#
-#   do we check that parameters are passed or defined globally? we should
-#
-
 ##############################
 # Building
 ##############################

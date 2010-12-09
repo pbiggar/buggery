@@ -1,0 +1,47 @@
+Features I need to add:
+
+# if it starts with a capital letter, display it#   if its a command with $$, display it
+#   "display it" means show the command, then show the output. But also capture it.
+
+# add 'exists(..) or/and/not' type syntax for predicates
+#   it would also be worth caching dependencies via a timestamp/SHA-1 to rebuild (we need some of make's functionality, not much)
+
+# allow comments in many more places
+
+# multiple levels of indentation means continue the command or line
+#     eg:
+#       command: 
+#         $ asdasd
+#           --some-flag
+#           --another-flag
+
+#   capture all flags, and apply them
+#     check they can be applied before running any commands
+#     all paths
+
+#   allow all python functions to be called by prefixing them with 'py'
+#     pyos.paths 
+
+# rename RETVAL to RESULT, ala Eiffel
+
+# -v should go in, then out, maybe using indentation and '>' and '<'
+
+# do we check that parameters are passed or defined globally? we should
+
+
+Tests that need to be written:
+
+# lots of test cases which don't raise, and which can be successfully parsed
+
+# lost of case sensitive stuff. Everything must be lower case, except the first
+# letter of top-level task definitions
+
+# lots of bad naming. spaces, illegal chars,  etc. TODO: lots of test cases
+# which don't raise, and which can be successfully parsed
+
+# lost of case sensitive stuff. Everything must be lower case, except the first
+# letter of top-level task definitions
+
+# lots of bad naming. spaces, illegal chars,  etc.
+
+# all the coverage stuff

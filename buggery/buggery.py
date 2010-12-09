@@ -849,5 +849,3 @@ def test_undefined_task():
 def test_simple():
   simple_buggery().run("mytask", [])
 
-# TODO: lost of case sensitive stuff. Everything must be lower case, except the first letter of top-level task definitions
-# TODO: lots of bad naming. spaces, illegal chars,  etc.
