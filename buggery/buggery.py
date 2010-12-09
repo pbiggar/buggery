@@ -13,6 +13,7 @@ import inspect
 import re
 import pdb
 import threading
+import time
 
 def bgrassert (cond):
   if not cond:
@@ -564,8 +565,6 @@ class Command(Subtask):
       stdin_proc = subprocess.PIPE
 
 
-    outs = ["", ""]
-
     class ThreadWorker(threading.Thread):
       def __init__(self, pipe, debug_target):
         super(ThreadWorker, self).__init__()
@@ -597,20 +596,16 @@ class Command(Subtask):
       stdout_worker.start()
       stderr_worker.start()
 
-
-      # Read directly so that we can save it and output it
-      # TODO: make this work with stderr too, possibly by using pexpect (where available)
       while proc.poll() is None:
-        pass
+        time.sleep(0.05)
 
     except KeyboardInterrupt, e:
       pass
 
-    stdout, stderr = stdout_worker.all, stderr_worker.all
     result = ProcData(command=command,
                       stdin=stdin_str,
-                      stdout=stdout.strip(),
-                      stderr=stderr.strip(),
+                      stdout=stdout_worker.all.strip(),
+                      stderr=stderr_worker.all.strip(),
                       exit_code=proc.returncode,
                       pid=proc.pid)
 
