@@ -1,0 +1,9 @@
+# TEST-output: default;overwritten;
+
+test:
+  t
+  t("overwritten")
+
+t(A="default"):
+  print ("@A;")
+  

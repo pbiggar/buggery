@@ -1,0 +1,6 @@
+test:
+  X = t2
+
+# No return value
+t2:
+  print ("")

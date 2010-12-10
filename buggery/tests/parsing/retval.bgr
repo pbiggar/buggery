@@ -1,0 +1,10 @@
+# TEST-output: asd
+
+t2:
+  RETVAL="asd"
+
+test:
+  X=t2
+  print (X)
+
+
