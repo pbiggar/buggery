@@ -13,7 +13,7 @@ startup:
   OBJDIR_BASELINE_OPT="@PWD/build_baseline_OPT.OBJ"
   OBJDIR_BASELINE_DBG="@PWD/build_baseline_DBG.OBJ"
   OBJDIR_BASELINE_NJN="@PWD/build_baseline_NJN.OBJ"
-  MAKE="make -j3"
+  MAKE="make -j2"
 
 # OSX: Gary Kwong from 612809 comment 1
   CROSS32_O1 = "CC='gcc-4.2 -arch i386' CXX='g++-4.2 -arch i386' HOST_CC='gcc-4.2' HOST_CXX='g++-4.2' RANLIB=ranlib AR=ar AS=$CC LD=ld STRIP='strip -x -S' CROSS_COMPILE=1 ../configure --target=i386-apple-darwin8.0.0 --enable-debug --disable-optimize --disable-tests"
@@ -25,10 +25,10 @@ startup:
   CROSS32_O3="CC='gcc -m32' CXX='g++ -m32' AR=ar ../configure --enable-debug --disable-optimize --target=i386-darwin"
 
 # OSX: From MOZCONFIG via browser build
-  CROSS32_O4="../configure  --enable-application=browser --target=i386-apple-darwin9.2.0 --with-macos-sdk=/Developer/SDKs/MacOSX10.5.sdk --enable-macos-target=10.5 --enable-threadsafe --enable-ctypes --disable-shared-js"
+  CROSS32_O4="CC='ccache gcc-4.2 -arch i386' CXX='ccache g++-4.2 -arch i386' ../configure  --enable-application=browser --host=x86_64-apple-darwin10.4.0 --target=i386-apple-darwin9.2.0 --with-macos-sdk=/Developer/SDKs/MacOSX10.5.sdk --enable-macos-target=10.5 --enable-threadsafe --enable-ctypes --with-system-nspr"
 
 # OSX: Minimum that should work
-  CROSS32_O5="../configure --target=i386-apple-darwin9.2.0 --with-macos-sdk=/Developer/SDKs/MacOSX10.5.sdk --enable-macos-target=10.5"
+  CROSS32_O5="../configure --target=i386-apple-darwin9.2.0 --with-macos-sdk=/Developer/SDKs/MacOSX10.5.sdk --enable-macos-target=10.5 --enable-ctypes"
 
 # Linux: Gary Kowng from 612809 comment 16
   CROSS32_L1="CC='gcc -m32' CXX='g++ -m32' AR=ar sh ../configure --target=i686-pc-linux --disable-tests --disable-optimize --enable-debug"
@@ -154,7 +154,6 @@ ubench(DIR=OBJDIR_OPT):
 
 njn(DIR1=OBJDIR_BASELINE_NJN, DIR2=OBJDIR_NJN):
   compile_njn
-# these would be better if I also included --enable-debug-symbols
   print ("I can't make this work. In your shell:")
   print ("  source ~/vcs/mozilla/njn.sh")
   print ("  ss_cmp_cg @DIR1 @DIR2")
