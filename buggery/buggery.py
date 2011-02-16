@@ -557,7 +557,7 @@ class Command(Subtask):
     command = self.command.interpolate(buggery, self)
 
     if buggery.options.verbose:
-      print "    $ " + command
+      print "    $ " + str(command)
 
     stdin_str, stdin_proc = None, None
     if self.stdin_var:
@@ -598,6 +598,9 @@ class Command(Subtask):
 
       while proc.poll() is None:
         time.sleep(0.05)
+
+      stdout_worker.join()
+      stderr_worker.join()
 
     except KeyboardInterrupt, e:
       pass
