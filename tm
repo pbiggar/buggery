@@ -42,7 +42,7 @@ startup:
 ##############################
 
 Check:
-  compile, test
+  compile_debug, test
 
 Quick:
   compile, jit-test, sunspider, ubench
@@ -53,7 +53,7 @@ Full:
 ##############################
 # Building
 ##############################
-compile(DIR=OBJDIR_OPT, CONFIGURE_FLAGS="--enable-optimize --disable-debug"):
+compile(DIR=OBJDIR_OPT, CONFIGURE_FLAGS="--enable-optimize --disable-debug --enable-debug-symbols"):
   possibly_configure (DIR, CONFIGURE_FLAGS)
   RETVAL=$ @MAKE -C @DIR
 
@@ -65,7 +65,7 @@ compile_njn(DIR=OBJDIR_NJN):
 
 
 possibly_configure(DIR, CONFIGURE_FLAGS):
-  $ test -e configure || autoconf213
+  $ autoconf213
   $ test -e @DIR || mkdir -p @DIR
   $ test -e @DIR/Makefile || (cd @DIR && ../configure @CONFIGURE_FLAGS --enable-threadsafe --with-system-nspr)
 
@@ -83,13 +83,17 @@ Tags:
 test:
   jit-test, ref-test
 
+valgrind-jit-test(TEST-SPEC="", DIR=OBJDIR_DBG):
+  $ @MAKE -C @DIR # don't want it to configure
+  $ python -u jit-test/jit_test.py @DIR/js --valgrind --jitflags=jmp @TEST-SPEC
+
 jit-test(TEST-SPEC="", DIR=OBJDIR_DBG):
   $ @MAKE -C @DIR # don't want it to configure
-  $ python -u jit-test/jit_test.py @DIR/js @TEST-SPEC
+  $ python -u jit-test/jit_test.py @DIR/js --jitflags=jmp @TEST-SPEC
 
 ref-test(TEST-SPEC="", DIR=OBJDIR_DBG):
   $ @MAKE -C @DIR # don't want it to configure
-  $ python -u tests/jstests.py --args="-j -m" @DIR/js @TEST-SPEC
+  $ LC_TIME=en_US.UTF-8 python -u tests/jstests.py --args="-jmp" @DIR/js @TEST-SPEC
 
 
 ##############################
@@ -118,7 +122,7 @@ Baseline: # run the benchmarks after popping all the directories
   compile_njn (OBJDIR_BASELINE_NJN)
 # Run the benchmarks for later comparisons
   RESULT_FILE1 = baseline_bench ("sunspider-0.9.1", "150")
-  RESULT_FILE2 = baseline_bench ("v8-v6", "75")
+  RESULT_FILE2 = baseline_bench ("v8-v4", "75")
   RESULT_FILE3 = baseline_bench ("ubench", "150")
   $ hg qgoto @PATCHNAME
   RETVAL="@RESULT_FILE1\n@RESULT_FILE2\n@RESULT_FILE3\n"
@@ -142,7 +146,7 @@ sunspider(DIR=OBJDIR_OPT):
   RETVAL=ss_harness_bench(DIR, "sunspider-0.9.1", "100")
 
 v8(DIR=OBJDIR_OPT):
-  RETVAL=ss_harness_bench(DIR, "v8-v6", "30")
+  RETVAL=ss_harness_bench(DIR, "v8-v4", "30")
 
 ubench(DIR=OBJDIR_OPT):
   RETVAL=ss_harness_bench(DIR, "ubench", "30")
@@ -175,16 +179,19 @@ newbug(BUGNUM):
   newclone (DIR)
   $ hg --cwd @DIR qimport bz://@BUGNUM
 
-newclone(DIR):
-  $ hg clone tracemonkey-clean @DIR
-  $ echo "default-push = ssh://hg.mozilla.org/tracemonkey" >> @DIR/.hg/hgrc
+newclone(DIR, PARENT_DIR="tracemonkey-clean"):
+  $ hg fetch --cwd @PARENT_DIR
+  $ hg clone @PARENT_DIR @DIR
+  PARENT=hg_parent(PARENT_DIR)
+  $ echo "default-push = ssh@PARENT" >> @DIR/.hg/hgrc
   $ hg --cwd @DIR qinit -c 
-  $ hg --cwd @DIR qimport -P ../sunspider.patch
-  $ hg --cwd @DIR qimport -P ../single_apply.patch
-  $ hg --cwd @DIR qnew baseline
+
+hg_parent(DIR):
+  RETVAL=$ hg --cwd @DIR showconfig | grep paths\.default= | sed 's/paths.default=https//' | sed 's/paths.default=http//' | sed 's/paths.default=//'
+  
 
 fetch:
-  PARENT=$ hg showconfig | grep paths\.default= | sed 's/paths.default=//'
+  PARENT=hg_parent(PWD)
   $ hg fetch --cwd @PARENT
   $ hg fetch
 

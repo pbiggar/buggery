@@ -590,6 +590,7 @@ class Command(Subtask):
 
       if stdin_str:
         proc.stdin.write(stdin_str)
+        proc.stdin.close()
 
       stdout_worker = ThreadWorker(proc.stdout, sys.stdout)
       stderr_worker = ThreadWorker(proc.stderr, sys.stderr)
