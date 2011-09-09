@@ -7,12 +7,15 @@ startup:
 # TODO: assert we're in the right directory
   PWD=$ pwd
   BRANCH=$ hg qtop | sed 's/no patches applied/baseline/'
-  OBJDIR_OPT="@PWD/build_@BRANCH\_OPT.OBJ"
-  OBJDIR_DBG="@PWD/build_@BRANCH\_DBG.OBJ"
-  OBJDIR_NJN="@PWD/build_@BRANCH\_NJN.OBJ"
-  OBJDIR_BASELINE_OPT="@PWD/build_baseline_OPT.OBJ"
-  OBJDIR_BASELINE_DBG="@PWD/build_baseline_DBG.OBJ"
-  OBJDIR_BASELINE_NJN="@PWD/build_baseline_NJN.OBJ"
+  OBJDIR_OPT="@PWD/objdir.OPT"
+  OBJDIR_DBG="@PWD/objdir.DBG"
+  OBJDIR_NJN="@PWD/objdir.NJN"
+  OBJDIR_OPT_32="@PWD/objdir.OPT.32"
+  OBJDIR_DBG_32="@PWD/objdir.DBG.32"
+  OBJDIR_NJN_32="@PWD/objdir.NJN.32"
+  OBJDIR_BASELINE_OPT="@PWD/objdir_baseline.OPT"
+  OBJDIR_BASELINE_DBG="@PWD/objdir_baseline.DBG"
+  OBJDIR_BASELINE_NJN="@PWD/objdir_baseline.NJN"
   MAKE="make -j2"
 
 # OSX: Gary Kwong from 612809 comment 1
@@ -42,39 +45,51 @@ startup:
 ##############################
 
 Check:
-  compile_debug, test
+  compile_debug, jit-test
 
 Quick:
-  compile, jit-test, sunspider, ubench
+  compile_opt, jit-test, sunspider, ubench
 
 Full:
-  compile, jit-test, ref-test, sunspider, v8, ubench, build-firefox, dump-patch
+  compile_opt, compile_debug, jit-test, ref-test, sunspider, v8, ubench, build-firefox, export 
 
 ##############################
 # Building
 ##############################
-compile(DIR=OBJDIR_OPT, CONFIGURE_FLAGS="--enable-optimize --disable-debug --enable-debug-symbols"):
-  possibly_configure (DIR, CONFIGURE_FLAGS)
+compile(DIR=OBJDIR_OPT, CONFIGURE_FLAGS, BIT32="0"):
+  CONFIGURE_FLAGS="@CONFIGURE_FLAGS --disable-disable-compile-environment --enable-threadsafe --with-sync-build-files=@PWD/../../"
+  possibly_configure (DIR, CONFIGURE_FLAGS, BIT32)
   RETVAL=$ @MAKE -C @DIR
 
-compile_debug(DIR=OBJDIR_DBG):
-  RETVAL=compile (DIR, "--enable-debug --disable-optimize")
+compile_debug(DIR=OBJDIR_DBG, CONFIGURE_FLAGS=""):
+  RETVAL=compile (DIR, "--enable-debug --disable-optimize --with-system-nspr @CONFIGURE_FLAGS")
 
-compile_njn(DIR=OBJDIR_NJN):
-  RETVAL=compile (DIR, "--enable-optimize --disable-debug --enable-debug-symbols")
+compile_opt (DIR=OBJDIR_OPT, CONFIGURE_FLAGS=""):
+  RETVAL=compile(DIR, "--enable-optimize --disable-debug --enable-debug-symbols --with-system-nspr @CONFIGURE_FLAGS")
+
+compile_debug_32(DIR=OBJDIR_DBG_32, CONFIGURE_FLAGS=""):
+  RETVAL=compile (DIR, "--enable-debug --disable-optimize @CONFIGURE_FLAGS", "1")
+
+compile_opt_32(DIR=OBJDIR_OPT_32, CONFIGURE_FLAGS=""):
+  RETVAL=compile(DIR, "--enable-optimize --disable-debug --enable-debug-symbols @CONFIGURE_FLAGS", "1")
 
 
-possibly_configure(DIR, CONFIGURE_FLAGS):
+#compile_njn(DIR=OBJDIR_NJN, CONFIGURE_FLAGS):
+#  RETVAL=compile_opt(DIR, "--enable-optimize --disable-debug --enable-debug-symbols")
+
+
+possibly_configure(DIR, CONFIGURE_FLAGS, BIT32):
   $ autoconf213
+  CC=$ test 1 -eq @BIT32 && echo 'CC="ccache gcc-4.2 -arch i386" CXX="ccache g++-4.2 -arch i386" CROSS_COMPILE=1' || echo ''
   $ test -e @DIR || mkdir -p @DIR
-  $ test -e @DIR/Makefile || (cd @DIR && ../configure @CONFIGURE_FLAGS --enable-threadsafe --with-system-nspr)
+  $ test -e @DIR/Makefile || (cd @DIR && @CC ../configure @CONFIGURE_FLAGS)
 
 
 Build-firefox:
   $ @MAKE -f client.mk build -C ../../
 
 Tags:
-  $ ctags -R --languages=c,c++ --exclude='build_*' .
+  $ ctags -R --languages=c,c++ --exclude='objdir*' --exclude='jsprvtd.h' .
 
 
 ##############################
@@ -89,7 +104,7 @@ valgrind-jit-test(TEST-SPEC="", DIR=OBJDIR_DBG):
 
 jit-test(TEST-SPEC="", DIR=OBJDIR_DBG):
   $ @MAKE -C @DIR # don't want it to configure
-  $ python -u jit-test/jit_test.py @DIR/js --jitflags=jmp @TEST-SPEC
+  $ python -u jit-test/jit_test.py @DIR/js --jitflags=,m,j,mj,mjp,mjd @TEST-SPEC
 
 ref-test(TEST-SPEC="", DIR=OBJDIR_DBG):
   $ @MAKE -C @DIR # don't want it to configure
@@ -112,6 +127,11 @@ bench(DIR, SUITE, RUN_COUNT, EXTRA_COMMAND=""):
 
   RETVAL="@NEWFILE" # TODO: there is an error if I sat X=Y, fix it.
 
+Rebase:
+  PATCHNAME=$ hg qtop
+  $ hg qpop -a
+  fetch
+  $ hg qgoto @PATCHNAME
 
 Baseline: # run the benchmarks after popping all the directories
   PATCHNAME=$ hg qtop
@@ -119,7 +139,7 @@ Baseline: # run the benchmarks after popping all the directories
 # Compile the different types we need later
   compile (OBJDIR_BASELINE_OPT)
   compile_debug (OBJDIR_BASELINE_DBG)
-  compile_njn (OBJDIR_BASELINE_NJN)
+#  compile_njn (OBJDIR_BASELINE_NJN)
 # Run the benchmarks for later comparisons
   RESULT_FILE1 = baseline_bench ("sunspider-0.9.1", "150")
   RESULT_FILE2 = baseline_bench ("v8-v4", "75")
@@ -156,30 +176,23 @@ ubench(DIR=OBJDIR_OPT):
 # Valgrind
 ##############################
 
-njn(DIR1=OBJDIR_BASELINE_NJN, DIR2=OBJDIR_NJN):
-  compile_njn
-  print ("I can't make this work. In your shell:")
-  print ("  source ~/vcs/mozilla/njn.sh")
-  print ("  ss_cmp_cg @DIR1 @DIR2")
-  print ("  v8_cmp_cg @DIR1 @DIR2")
-  print ("  ub_cmp_cg @DIR1 @DIR2")
+#njn(DIR1=OBJDIR_BASELINE_NJN, DIR2=OBJDIR_NJN):
+#  compile_njn
+#  print ("I can't make this work. In your shell:")
+#  print ("  source ~/vcs/mozilla/njn.sh")
+#  print ("  ss_cmp_cg @DIR1 @DIR2")
+#  print ("  v8_cmp_cg @DIR1 @DIR2")
+#  print ("  ub_cmp_cg @DIR1 @DIR2")
   
 
 
 ##############################
 # Utils
 ##############################
-# TODO: baseline is my own stuff
-dump-patch:
-  $ hg diff --rev baseline:. > `hg qtop`.patch
+export:
+  $ hg export qbase:@BRANCH > ~/work/mozilla/@BRANCH.patch
 
-
-newbug(BUGNUM):
-  DIR="bug@BUGNUM"
-  newclone (DIR)
-  $ hg --cwd @DIR qimport bz://@BUGNUM
-
-newclone(DIR, PARENT_DIR="tracemonkey-clean"):
+newclone(DIR, PARENT_DIR="clean-mozilla-central"):
   $ hg fetch --cwd @PARENT_DIR
   $ hg clone @PARENT_DIR @DIR
   PARENT=hg_parent(PARENT_DIR)
@@ -197,7 +210,7 @@ fetch:
 
 tmhgurl:
   REV=$ hg identify -i
-  RETVAL = "http://hg.mozilla.org/tracemonkey/rev/@REV"
+  RETVAL = "http://hg.mozilla.org/mozilla-central/rev/@REV"
 
 disfile(FILENAME):
   RETVAL=$ @OBJDIR_DBG/js -e 'disfile("-r", "-l", "@FILENAME")'
